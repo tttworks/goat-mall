@@ -30,11 +30,22 @@ class MediaController extends Controller
 
     public function storeListingImage(Request $request): JsonResponse
     {
+        return $this->store($request, 'listings');
+    }
+
+    /** 社群发帖图片：目录锁死 posts，与商品图/头像分开，便于按目录做清理与配额 */
+    public function storePostImage(Request $request): JsonResponse
+    {
+        return $this->store($request, 'posts');
+    }
+
+    private function store(Request $request, string $folder): JsonResponse
+    {
         $validated = $request->validate([
             'file' => ['required', 'file', 'image', 'max:10240'],
         ]);
 
-        $key = $this->presigner->store($validated['file'], 'listings');
+        $key = $this->presigner->store($validated['file'], $folder);
 
         return response()->json([
             'data' => [

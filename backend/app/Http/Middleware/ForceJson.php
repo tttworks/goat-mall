@@ -21,7 +21,10 @@ class ForceJson
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->headers->has('Accept')) {
+        // 不能只判断「有没有 Accept」：浏览器/uni-app 的 XHR 会自动带 `Accept: */*`，
+        // 这种情况下 expectsJson() 为 false，未登录请求会被框架重定向到不存在的 login 路由，
+        // 结果是 500 而不是 401。API 组内一律按 JSON 协商。
+        if (! $request->wantsJson()) {
             $request->headers->set('Accept', 'application/json');
         }
 

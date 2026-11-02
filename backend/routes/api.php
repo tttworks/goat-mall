@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\PostController as AdminPostController;
 use App\Http\Controllers\Api\Admin\RefundController as AdminRefundController;
+use App\Http\Controllers\Api\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuctionController;
 use App\Http\Controllers\Api\AuthController;
@@ -40,6 +41,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PostController;
 use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\RealtimeController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RefundController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\SellerAuctionController;
@@ -272,6 +274,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::delete('/posts/{post}', [PostController::class, 'destroy'])
             ->whereNumber('post')->name('posts.destroy');
 
+        // 发帖图片上传：目录锁死 posts（服务端代传，C 端 chooseImage 后逐张上传）
+        Route::post('/posts/media', [MediaController::class, 'storePostImage'])->name('posts.media.store');
+
+        // 举报（T6）：商品 / 帖子 / 用户三类目标共用一个入口
+        Route::post('/reports', [ReportController::class, 'store'])->name('reports.store');
+
         Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');
         Route::post('/conversations', [ConversationController::class, 'store'])->name('conversations.store');
         Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index'])
@@ -280,11 +288,15 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->whereNumber('conversation')->name('messages.store');
     });
 
-    // 帖子人工审核（T6，仅 admin）：只处理 pending
+    // 帖子人工审核 + 举报队列（T6，仅 admin）：都只处理 pending
     Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('/posts', [AdminPostController::class, 'index'])->name('posts.index');
         Route::post('/posts/{post}/review', [AdminPostController::class, 'review'])
             ->whereNumber('post')->name('posts.review');
+
+        Route::get('/reports', [AdminReportController::class, 'index'])->name('reports.index');
+        Route::post('/reports/{report}/handle', [AdminReportController::class, 'handle'])
+            ->whereNumber('report')->name('reports.handle');
     });
 
     // ---------------- 采集触发（T7，仅 admin，契约 §4）----------------

@@ -51,6 +51,14 @@ class PostService
             throw SocialException::invalid(sprintf('最多上传 %d 张图片', $maxImages));
         }
 
+        // 只认发帖目录下的 key：否则客户端可以把别人的商品图/头像 key 塞进帖子，
+        // 既能蹭图也能绕过目录层的清理策略
+        foreach ($images as $key) {
+            if (preg_match('#^posts/[0-9]{4}/[0-9]{2}/[A-Za-z0-9_\-]+\.(jpg|jpeg|png|webp|avif)$#', $key) !== 1) {
+                throw SocialException::invalid('图片标识不合法，请重新上传');
+            }
+        }
+
         $content = mb_substr($content, 0, 1000);
         $result = $this->moderation->screen($content, $images);
 
