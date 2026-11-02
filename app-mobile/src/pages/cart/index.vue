@@ -7,6 +7,19 @@
 
 <template>
   <view class="cart">
+    <!-- 结算前必须确认寄往哪：放最上方，避免一路下拉到结算按钮才发现没地址 -->
+    <view v-if="items.length" class="g-card cart__addr" @tap="openAddresses">
+      <view class="g-flex-1">
+        <text class="cart__addr-title">{{ address ? '寄往' : '收货地址' }}</text>
+        <text v-if="address" class="cart__addr-text">
+          {{ address.receiver_name }} {{ address.receiver_phone }}
+        </text>
+        <text v-if="address" class="cart__addr-text">{{ address.region }}{{ address.detail }}</text>
+        <text v-else class="g-dim">请先填写收货地址</text>
+      </view>
+      <text class="g-dim cart__addr-arrow">›</text>
+    </view>
+
     <view v-if="items.length" class="cart__head">
       <text class="g-muted">共 {{ items.length }} 件 · 已选 {{ selected.length }} 件</text>
       <text class="g-muted" @tap="onClear">清空</text>
@@ -84,6 +97,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
+import { listAddresses, takeSelectedAddress } from '../../api/address'
 import { clearCart, listCart, removeFromCart } from '../../api/social'
 import { createOrder } from '../../api/trade'
 import { money } from '../../utils/format'
@@ -93,6 +107,28 @@ const items = ref([])
 const selectedIds = ref([])
 const loading = ref(false)
 const submitting = ref(false)
+const address = ref(null)
+
+/** 地址与商品同时刷新：从地址簿返回后结算条上的地址要立刻变 */
+async function syncAddress() {
+  const picked = takeSelectedAddress()
+  if (picked) {
+    address.value = picked
+    return
+  }
+
+  try {
+    const payload = await listAddresses()
+    const rows = payload.data || []
+    address.value = rows.find((row) => row.is_default) || rows[0] || null
+  } catch (e) {
+    address.value = null
+  }
+}
+
+function openAddresses() {
+  uni.navigateTo({ url: '/pages/me/addresses?select=1' })
+}
 
 /** 只把「仍可购买」的行算进已选，避免商品被人买走后金额还挂在结算条上 */
 const selected = computed(() =>
@@ -163,6 +199,17 @@ async function onClear() {
 async function checkout() {
   if (!selected.value.length || submitting.value) return
 
+  // 服务端会拒无地址下单，但先在这里拦一步，能直接把人带到地址页
+  if (!address.value) {
+    const goAdd = await confirmModal({
+      title: '还没有收货地址',
+      content: '实物交易需要收货地址，去添加一条？',
+      confirmText: '去填写'
+    })
+    if (goAdd) uni.navigateTo({ url: '/pages/me/addresses' })
+    return
+  }
+
   submitting.value = true
   let created = 0
   const failed = []
@@ -170,7 +217,8 @@ async function checkout() {
   try {
     for (const row of selected.value) {
       try {
-        await createOrder({ listing_id: row.listing_id })
+        // 同一批结算共用同一条收货地址（快照落进每张订单）
+        await createOrder({ listing_id: row.listing_id, address_id: address.value.address_id })
         created += 1
         // 下单成功才移出购物车；失败保留，方便用户回来看看到底哪件没了
         await removeFromCart(row.listing_id).catch(() => {})
@@ -208,6 +256,7 @@ function goHome() {
 
 onShow(() => {
   load()
+  syncAddress()
 })
 </script>
 
@@ -215,6 +264,31 @@ onShow(() => {
 .cart {
   min-height: 100vh;
   padding: 24rpx 24rpx 200rpx;
+}
+
+.cart__addr {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 16rpx;
+}
+
+.cart__addr-title {
+  display: block;
+  margin-bottom: 6rpx;
+  color: $goat-text-muted;
+  font-size: 24rpx;
+}
+
+.cart__addr-text {
+  display: block;
+  color: $goat-text;
+  font-size: 26rpx;
+  line-height: 1.5;
+}
+
+.cart__addr-arrow {
+  font-size: 32rpx;
 }
 
 .cart__head {

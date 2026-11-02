@@ -23,6 +23,10 @@
           <text class="g-price__symbol">¥</text>{{ money(listing.price) }}
         </text>
         <text class="g-tag"><text>{{ conditionLabel(listing.condition) }}</text></text>
+        <!-- 运费是挂牌条件：买家下单前必须知道「包邮」还是「另需 N 元」 -->
+        <text class="g-tag detail__ship" :class="{ 'g-tag--accent': shippingFee > 0 }">
+          <text>{{ shippingText }}</text>
+        </text>
       </view>
       <text class="detail__title">{{ listing.title }}</text>
 
@@ -43,6 +47,18 @@
         <view class="g-btn g-btn--sm" @tap="followSellerAction">
           <text>{{ following ? '已关注' : '关注' }}</text>
         </view>
+      </view>
+
+      <view class="g-card detail__addr" @tap="openAddresses">
+        <view class="g-flex-1">
+          <text class="detail__addr-title">{{ address ? '寄往' : '收货地址' }}</text>
+          <text v-if="address" class="detail__addr-text">
+            {{ address.receiver_name }} {{ address.receiver_phone }}
+          </text>
+          <text v-if="address" class="detail__addr-text">{{ address.region }}{{ address.detail }}</text>
+          <text v-else class="g-dim">下单前请填写收货地址</text>
+        </view>
+        <text class="g-dim detail__addr-arrow">›</text>
       </view>
 
       <view class="detail__notice">
@@ -80,7 +96,8 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { listAddresses, takeSelectedAddress } from '../../api/address'
 import { getListing } from '../../api/catalog'
 import { addFavorite, addToCart, followSeller, listFavorites, openConversation, removeFavorite } from '../../api/social'
 import { createOrder, payOrder, simulatePayment } from '../../api/trade'
@@ -93,6 +110,7 @@ const loading = ref(false)
 const submitting = ref(false)
 const favorited = ref(false)
 const following = ref(false)
+const address = ref(null)
 
 const gallery = computed(() => {
   if (!listing.value) return []
@@ -104,6 +122,42 @@ const gallery = computed(() => {
 })
 
 const purchasable = computed(() => listing.value?.status === 'active' && listing.value?.stock > 0)
+
+/** 运费由卖家挂牌时定，展示口径与下单口径必须一致（下单以服务端为准） */
+const shippingFee = computed(() => Number(listing.value?.shipping_fee || 0))
+
+const shippingText = computed(() => (shippingFee.value > 0 ? `运费 ¥${money(shippingFee.value)}` : '包邮'))
+
+const payableTotal = computed(() => Number(listing.value?.price || 0) + shippingFee.value)
+
+/** 下单前必须有收货地址：优先用地址页刚选中的那条，否则回落到默认地址 */
+async function syncAddress() {
+  if (!isLoggedIn()) {
+    address.value = null
+    return
+  }
+
+  const picked = takeSelectedAddress()
+  if (picked) {
+    address.value = picked
+    return
+  }
+
+  try {
+    const payload = await listAddresses()
+    const rows = payload.data || []
+    address.value = rows.find((row) => row.is_default) || rows[0] || null
+  } catch (e) {
+    address.value = null
+  }
+}
+
+function openAddresses() {
+  if (!requireLogin()) return
+
+  // select=1 让地址页进入「点一条就返回」的模式
+  uni.navigateTo({ url: '/pages/me/addresses?select=1' })
+}
 
 // 没开店档案时回落到卖家 id：旧数据（店铺页未上线前上架）也要能显示，不能是空白标题
 const shopName = computed(() => listing.value?.seller?.shop_name || `卖家 #${listing.value?.seller_id ?? ''}`)
@@ -207,16 +261,30 @@ async function buy() {
   }
   if (submitting.value) return
 
+  // 没有地址就先补：服务端也会拒，但在这里拦能少一次无效请求、也能直接把人带到地址页
+  if (!address.value) {
+    const goAdd = await confirmModal({
+      title: '还没有收货地址',
+      content: '实物交易需要收货地址，去添加一条？',
+      confirmText: '去填写'
+    })
+    if (goAdd) uni.navigateTo({ url: '/pages/me/addresses' })
+    return
+  }
+
   const ok = await confirmModal({
     title: '确认下单',
-    content: `${listing.value.title}\n应付 ¥${money(listing.value.price)}`,
+    content: `${listing.value.title}\n应付 ¥${money(payableTotal.value)}（${shippingText.value}）\n寄往：${address.value.receiver_name} ${address.value.region}${address.value.detail}`,
     confirmText: '去支付'
   })
   if (!ok) return
 
   submitting.value = true
   try {
-    const created = await createOrder({ listing_id: listing.value.listing_id })
+    const created = await createOrder({
+      listing_id: listing.value.listing_id,
+      address_id: address.value.address_id
+    })
     const orderId = created.data?.order_id
     if (!orderId) throw new Error('下单失败')
 
@@ -278,6 +346,9 @@ onLoad((options) => {
     toast('缺少商品参数')
   }
 })
+
+// 从地址簿返回要立刻生效：用户刚选的那条就是本次下单地址
+onShow(syncAddress)
 </script>
 
 <style lang="scss" scoped>
@@ -366,6 +437,35 @@ onLoad((options) => {
   color: $goat-text;
   font-size: 28rpx;
   margin-bottom: 6rpx;
+}
+
+.detail__ship {
+  margin-left: auto;
+}
+
+.detail__addr {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-top: 20rpx;
+}
+
+.detail__addr-title {
+  display: block;
+  margin-bottom: 6rpx;
+  color: $goat-text-muted;
+  font-size: 24rpx;
+}
+
+.detail__addr-text {
+  display: block;
+  color: $goat-text;
+  font-size: 26rpx;
+  line-height: 1.5;
+}
+
+.detail__addr-arrow {
+  font-size: 32rpx;
 }
 
 .detail__notice {

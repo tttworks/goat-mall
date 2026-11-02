@@ -53,6 +53,11 @@
         <text class="entry__label">我的收藏</text>
         <text class="entry__arrow">›</text>
       </view>
+      <view class="entry" @tap="go('/pages/me/addresses')">
+        <text class="entry__icon">⌂</text>
+        <text class="entry__label">收货地址</text>
+        <text class="entry__arrow">›</text>
+      </view>
       <view class="entry" @tap="go('/pages/me/refunds')">
         <text class="entry__icon">↺</text>
         <text class="entry__label">退款/售后</text>

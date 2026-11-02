@@ -67,6 +67,12 @@
       }
     },
     {
+      "path": "pages/me/addresses",
+      "style": {
+        "navigationBarTitleText": "收货地址"
+      }
+    },
+    {
       "path": "pages/me/favorites",
       "style": {
         "navigationBarTitleText": "我的收藏",

@@ -42,6 +42,14 @@
           </view>
         </view>
 
+        <!-- 收件快照：卖家照着它发货、买家照着它核对；订单建立后不随地址簿变化 -->
+        <view v-if="order.receiver && order.receiver.name" class="order__receiver">
+          <text class="g-dim order__receiver-label">寄往</text>
+          <text class="order__receiver-text">
+            {{ order.receiver.name }} {{ order.receiver.phone }} · {{ order.receiver.region }}{{ order.receiver.detail }}
+          </text>
+        </view>
+
         <view class="g-row--between order__foot">
           <text class="g-dim">{{ order.shipping_company ? `${order.shipping_company} ${order.tracking_no}` : relativeTime(order.created_at) }}</text>
           <text class="g-price order__amount"><text class="g-price__symbol">¥</text>{{ money(order.payable_amount) }}</text>
@@ -430,6 +438,27 @@ onPullDownRefresh(async () => {
   font-size: 26rpx;
   line-height: 1.45;
   margin-bottom: 8rpx;
+}
+
+.order__receiver {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 12rpx;
+  padding: 16rpx;
+  background-color: $goat-surface-2;
+  border-radius: $goat-radius-sm;
+}
+
+.order__receiver-label {
+  flex-shrink: 0;
+  font-size: 24rpx;
+}
+
+.order__receiver-text {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 24rpx;
+  line-height: 1.5;
 }
 
 .order__foot {

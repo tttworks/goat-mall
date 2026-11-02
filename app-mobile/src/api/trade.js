@@ -13,10 +13,10 @@ import { http, makeIdempotencyKey } from './request'
  * 「下单」「发起支付」都必须带 Idempotency-Key：用户连点两下不能出两单、两笔支付。
  * 键在这里生成而不是页面里，保证任何入口调同一个方法都天然幂等。
  */
-export function createOrder({ listing_id, remark }) {
+export function createOrder({ listing_id, address_id, remark }) {
   return http.post(
     '/orders',
-    { listing_id, remark },
+    { listing_id, address_id, remark },
     { header: { 'Idempotency-Key': makeIdempotencyKey('order') } }
   )
 }

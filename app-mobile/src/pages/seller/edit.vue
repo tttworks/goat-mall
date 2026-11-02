@@ -84,6 +84,23 @@
         </view>
       </view>
 
+      <view class="edit__row">
+        <view class="edit__section edit__section--half">
+          <text class="edit__label">运费（元）</text>
+          <input
+            v-model="form.shipping_fee"
+            class="g-input"
+            type="digit"
+            placeholder="0 表示包邮"
+            placeholder-class="g-placeholder"
+          />
+        </view>
+        <view class="edit__section edit__section--half">
+          <text class="edit__label">合计（买家付）</text>
+          <text class="edit__total">¥{{ money(payableTotal) }}<text v-if="!Number(form.shipping_fee)" class="edit__total-hint">含包邮</text></text>
+        </view>
+      </view>
+
       <view class="edit__section">
         <text class="edit__label">商品描述</text>
         <textarea
@@ -117,6 +134,7 @@
             <text class="preview__title g-clamp-2">{{ form.title || '未填写标题' }}</text>
             <text class="g-tag"><text>{{ conditionLabel(form.condition) }}</text></text>
             <text class="g-price preview__price"><text class="g-price__symbol">¥</text>{{ money(form.price || 0) }}</text>
+            <text class="g-dim preview__ship">{{ Number(form.shipping_fee) > 0 ? `运费 ¥${money(form.shipping_fee)}` : '包邮' }}</text>
           </view>
         </view>
       </view>
@@ -175,8 +193,12 @@ const form = reactive({
   figure_id: null,
   condition: 'like_new',
   price: '',
+  shipping_fee: '0',
   stock: '1'
 })
+
+/** 买家实际要付的钱：售价 + 运费，卖家填的时候就能看到总数 */
+const payableTotal = computed(() => Number(form.price || 0) + Number(form.shipping_fee || 0))
 
 const isEdit = computed(() => listingId.value > 0)
 const coverUrl = computed(() => coverPreview.value)
@@ -196,6 +218,7 @@ async function load() {
     form.figure_id = data.figure_id || null
     form.condition = data.condition || 'like_new'
     form.price = String(data.price ?? '')
+    form.shipping_fee = String(data.shipping_fee ?? '0')
     form.stock = String(data.stock ?? 1)
     listingStatus.value = data.status || ''
     figure.value = data.figure || null
@@ -297,6 +320,11 @@ function validate(submitNow) {
   if (!/^\d{1,8}(\.\d{1,2})?$/.test(String(form.price).trim())) {
     return '售价格式不对（最多两位小数）'
   }
+  // 运费可以留空（包邮），填了就必须是合法金额
+  const shipping = String(form.shipping_fee ?? '').trim()
+  if (shipping !== '' && !/^\d{1,8}(\.\d{1,2})?$/.test(shipping)) {
+    return '运费格式不对（最多两位小数，0 表示包邮）'
+  }
   if (Number(form.stock) < 1) {
     return '库存至少 1'
   }
@@ -326,6 +354,8 @@ async function save(submitNow) {
     figure_id: form.figure_id || undefined,
     condition: form.condition,
     price: String(form.price).trim(),
+    // 空串按 0 提交（包邮）：后端 nullable 也会落 0，这里显式给值语义更清楚
+    shipping_fee: String(form.shipping_fee ?? '').trim() || '0',
     stock: Number(form.stock) || 1,
     // 只有本次真的上传/删除过才回传，避免「没动图却把图清空」
     cover_key: coverKey.value || undefined,
@@ -394,6 +424,22 @@ onLoad((options) => {
 .edit__label {
   color: $goat-text-muted;
   font-size: 24rpx;
+}
+
+.edit__total {
+  display: flex;
+  align-items: baseline;
+  gap: 10rpx;
+  min-height: 72rpx;
+  color: $goat-accent;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.edit__total-hint {
+  color: $goat-text-muted;
+  font-size: 22rpx;
+  font-weight: 400;
 }
 
 .edit__textarea {
