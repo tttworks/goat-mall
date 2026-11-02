@@ -16,11 +16,26 @@
         :maxlength="1000"
         auto-height
       />
+      <view class="composer__images">
+        <view v-for="(item, index) in images" :key="item.key" class="composer__thumb">
+          <image class="composer__thumb-img" :src="item.url" mode="aspectFill" />
+          <view class="composer__remove" @tap.stop="removeImage(index)"><text>×</text></view>
+        </view>
+        <view
+          v-if="images.length < maxImages"
+          class="composer__add"
+          :class="{ 'composer__add--disabled': uploading }"
+          @tap="pickImages"
+        >
+          <text>{{ uploading ? '上传中…' : '+' }}</text>
+        </view>
+      </view>
+
       <view class="g-row--between composer__footer">
-        <text class="g-dim">{{ draft.length }}/1000 · 发布后需过机审</text>
+        <text class="g-dim">{{ draft.length }}/1000 · {{ images.length }}/{{ maxImages }} 图 · 发布后需过机审</text>
         <view
           class="g-btn g-btn--primary g-btn--sm"
-          :class="{ 'g-btn--disabled': publishing || !draft.trim() }"
+          :class="{ 'g-btn--disabled': !canPublish }"
           @tap="publish"
         >
           <text>{{ publishing ? '发布中…' : '发布' }}</text>
@@ -39,6 +54,7 @@
             <text class="post__name">{{ post.author?.nickname || post.author?.username || '匿名玩家' }}</text>
             <text class="g-dim">{{ relativeTime(post.created_at) }}</text>
           </view>
+          <text v-if="canReport(post)" class="post__report" @tap.stop="report(post)">举报</text>
         </view>
 
         <text class="post__content">{{ post.content }}</text>
@@ -66,19 +82,77 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
-import { createPost, listPosts } from '../../api/social'
-import { requireLogin } from '../../store/session'
+import { createPost, listPosts, uploadPostImage } from '../../api/social'
+import { requireLogin, session } from '../../store/session'
 import { relativeTime } from '../../utils/format'
 import { toast } from '../../utils/ui'
 
+const MAX_IMAGES = 9
 const posts = ref([])
 const draft = ref('')
+const images = ref([])
+const uploading = ref(false)
 const publishing = ref(false)
 const loading = ref(false)
 const hasMore = ref(true)
 const page = ref(1)
+
+const maxImages = MAX_IMAGES
+const canPublish = computed(() => {
+  return !publishing.value && !uploading.value && (draft.value.trim().length > 0 || images.value.length > 0)
+})
+
+/** 只给别人的帖子显示举报入口：自己的内容交给撤回，不制造无意义工单 */
+function canReport(post) {
+  const me = session.user?.user_id
+  return Boolean(me) && Number(post.author?.user_id) !== Number(me)
+}
+
+/** 逐张上传：uni.chooseImage 一次可多选，但接口只收单文件，串行上传给用户确定的进度反馈 */
+async function pickImages() {
+  if (!requireLogin()) return
+  if (uploading.value) return
+
+  const remain = MAX_IMAGES - images.value.length
+  if (remain <= 0) return
+
+  uni.chooseImage({
+    count: remain,
+    sizeType: ['compressed'],
+    sourceType: ['album', 'camera'],
+    success: async (res) => {
+      const paths = res.tempFilePaths || []
+      if (!paths.length) return
+
+      uploading.value = true
+      try {
+        for (const filePath of paths) {
+          const payload = await uploadPostImage(filePath)
+          images.value.push({ key: payload.data.key, url: payload.data.url })
+        }
+      } catch (e) {
+        // upload 层已提示；已成功的图片保留，用户可以重试剩余张数
+      } finally {
+        uploading.value = false
+      }
+    }
+  })
+}
+
+function removeImage(index) {
+  images.value.splice(index, 1)
+}
+
+function report(post) {
+  if (!requireLogin()) return
+
+  const title = (post.content || '纯图片帖').slice(0, 20)
+  uni.navigateTo({
+    url: `/pages/report/index?target_type=post&target_id=${post.post_id}&title=${encodeURIComponent(title)}`
+  })
+}
 
 async function load(reset = false) {
   if (loading.value) return
@@ -106,21 +180,25 @@ async function load(reset = false) {
  */
 async function publish() {
   if (!requireLogin()) return
-  if (!draft.value.trim() || publishing.value) return
+  if (!canPublish.value) return
 
   publishing.value = true
   try {
-    const payload = await createPost({ content: draft.value.trim() })
+    const payload = await createPost({
+      content: draft.value.trim(),
+      images: images.value.map((item) => item.key)
+    })
     const status = payload.data?.status
 
     if (status === 'approved') {
       posts.value.unshift(payload.data)
-      draft.value = ''
+      resetComposer()
       toast('发布成功')
     } else if (status === 'pending') {
-      draft.value = ''
+      resetComposer()
       toast('已提交，审核通过后展示')
     } else {
+      // 被机审拒绝时保留草稿与已上传图片，用户改完能直接再发一次
       toast(payload.data?.reject_reason || '内容未通过机审，请修改后重试')
     }
   } catch (e) {
@@ -128,6 +206,11 @@ async function publish() {
   } finally {
     publishing.value = false
   }
+}
+
+function resetComposer() {
+  draft.value = ''
+  images.value = []
 }
 
 function preview(urls, index) {
@@ -167,8 +250,66 @@ load(true)
   line-height: 1.6;
 }
 
+.composer__images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.composer__thumb {
+  position: relative;
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: $goat-radius-sm;
+  overflow: hidden;
+  background-color: $goat-surface-2;
+}
+
+.composer__thumb-img {
+  width: 100%;
+  height: 100%;
+}
+
+.composer__remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 40rpx;
+  height: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 26rpx;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-bottom-left-radius: $goat-radius-sm;
+}
+
+.composer__add {
+  width: 160rpx;
+  height: 160rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $goat-accent;
+  font-size: 44rpx;
+  border: 1rpx dashed $goat-border;
+  border-radius: $goat-radius-sm;
+}
+
+.composer__add--disabled {
+  color: $goat-text-dim;
+}
+
 .composer__footer {
   align-items: flex-end;
+}
+
+.post__report {
+  flex-shrink: 0;
+  padding-left: 16rpx;
+  color: $goat-text-dim;
+  font-size: 24rpx;
 }
 
 .posts {

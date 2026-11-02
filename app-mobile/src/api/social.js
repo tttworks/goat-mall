@@ -5,7 +5,7 @@
  * 本文件为 GOAT 自有代码；第三方框架（Laravel / uni-app / 等）版权归各自权利人。
  */
 
-import { http } from './request'
+import { http, upload } from './request'
 
 /* ---------- 收藏 ---------- */
 export function listFavorites(params = {}) {
@@ -53,6 +53,25 @@ export function createPost({ content, images }) {
 
 export function listMyPosts(params = {}) {
   return http.get('/me/posts', { data: params, silent: true })
+}
+
+export function withdrawPost(postId) {
+  return http.del(`/posts/${postId}`)
+}
+
+/** 发帖图片上传（multipart）：返回 { key, url }，key 存库、url 只用于预览 */
+export function uploadPostImage(filePath) {
+  return upload('/posts/media', filePath, { name: 'file' })
+}
+
+/* ---------- 举报 ---------- */
+export function submitReport({ targetType, targetId, reason, detail = '' }) {
+  return http.post('/reports', {
+    target_type: targetType,
+    target_id: targetId,
+    reason,
+    detail
+  })
 }
 
 /* ---------- 私信 ---------- */

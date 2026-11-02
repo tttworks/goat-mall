@@ -154,6 +154,12 @@
       "style": {
         "navigationBarTitleText": "实名认证"
       }
+    },
+    {
+      "path": "pages/report/index",
+      "style": {
+        "navigationBarTitleText": "举报"
+      }
     }
   ],
   "globalStyle": {

@@ -64,6 +64,10 @@
       <view class="detail__notice">
         <text class="g-dim">担保说明：付款后资金由平台冻结，收到货确认无误才结算给卖家；卖家超时未发货会在付款 3 天后提醒双方，届时可申请退款。发货 {{ autoConfirmDays }} 天后未确认收货，系统将自动确认并结算。</text>
       </view>
+
+      <view v-if="canReportListing" class="detail__report" @tap="reportListing">
+        <text class="g-dim">举报该商品</text>
+      </view>
     </view>
 
     <view class="detail__bar">
@@ -101,7 +105,7 @@ import { listAddresses, takeSelectedAddress } from '../../api/address'
 import { getListing } from '../../api/catalog'
 import { addFavorite, addToCart, followSeller, listFavorites, openConversation, removeFavorite } from '../../api/social'
 import { createOrder, payOrder, simulatePayment } from '../../api/trade'
-import { isLoggedIn, requireLogin } from '../../store/session'
+import { isLoggedIn, requireLogin, session } from '../../store/session'
 import { conditionLabel, money } from '../../utils/format'
 import { confirmModal, toast } from '../../utils/ui'
 
@@ -153,6 +157,20 @@ async function syncAddress() {
   } catch (e) {
     address.value = null
   }
+}
+
+/** 自己的商品不显示举报入口：卖家要下架走「我的」里的操作 */
+const canReportListing = computed(() => {
+  if (!isLoggedIn() || !listing.value) return false
+  return Number(session.user?.user_id) !== Number(listing.value.seller_id)
+})
+
+function reportListing() {
+  if (!requireLogin()) return
+
+  uni.navigateTo({
+    url: `/pages/report/index?target_type=listing&target_id=${listing.value.listing_id}&title=${encodeURIComponent(listing.value.title || '')}`
+  })
 }
 
 function openAddresses() {
@@ -475,6 +493,13 @@ onShow(syncAddress)
   margin-top: 20rpx;
   padding: 0 8rpx;
   line-height: 1.7;
+}
+
+.detail__report {
+  margin-top: 16rpx;
+  padding: 0 8rpx;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .detail__bar {
