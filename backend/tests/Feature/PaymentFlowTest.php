@@ -15,6 +15,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\SellerProfile;
 use App\Models\User;
+use App\Models\UserNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
@@ -258,5 +259,46 @@ class PaymentFlowTest extends TestCase
 
         $this->getJson("/api/v1/orders/{$orderId}")->assertStatus(403);
         $this->assertDatabaseHas('orders', ['order_id' => $orderId, 'status' => 'pending_payment']);
+    }
+
+    /**
+     * 沙箱模拟支付：演示/联调走的也必须是「验签 + 金额比对」的正规链路，
+     * 否则等上线换真渠道时才暴露回调缺陷。
+     */
+    public function test_sandbox_pay_goes_through_real_notify_pipeline(): void
+    {
+        $this->seedFeeRule();
+
+        $seller = $this->makeSeller();
+        $buyer = $this->makeUser('goat_buyer4');
+        $other = $this->makeUser('goat_other4');
+        $listing = $this->makeListing($seller);
+
+        $orderId = $this->placeOrder($buyer, $listing, 'order-key-4');
+
+        $paymentId = (int) $this->postJson("/api/v1/orders/{$orderId}/payments", ['idempotency_key' => 'pay-key-4'])
+            ->assertCreated()
+            ->json('data.payment_id');
+
+        // 越权：别人不能替买家付款
+        Sanctum::actingAs($other);
+        $this->postJson("/api/v1/payments/{$paymentId}/sandbox-pay")->assertStatus(422);
+
+        Sanctum::actingAs($buyer);
+        $this->postJson("/api/v1/payments/{$paymentId}/sandbox-pay")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'frozen');
+
+        // 幂等方向：已付款的支付单不能再付一次
+        $this->postJson("/api/v1/payments/{$paymentId}/sandbox-pay")->assertStatus(422);
+
+        $this->assertDatabaseHas('orders', ['order_id' => $orderId, 'status' => 'paid', 'escrow_status' => 'frozen']);
+        $this->assertSame(1, Payment::query()->where('order_id', $orderId)->count());
+
+        // 双方各一条通知（重复回调靠 dedupe_key 吸掉）
+        $this->assertSame(1, UserNotification::query()
+            ->where('user_id', $buyer->user_id)->where('type', 'order.paid')->count());
+        $this->assertSame(1, UserNotification::query()
+            ->where('user_id', $seller->user_id)->where('type', 'order.pending_ship')->count());
     }
 }

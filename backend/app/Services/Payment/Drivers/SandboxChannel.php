@@ -101,6 +101,29 @@ class SandboxChannel implements PaymentChannel
         return trim((string) $value);
     }
 
+    /**
+     * 生成一条「合法签名」的异步通知（仅沙箱联调用）。
+     *
+     * 为什么放在驱动里而不是控制器里：签名算法属于通道私有知识，
+     * 控制器只该知道「给支付单发条成功通知」；换成微信通道时这段整体消失。
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{raw: string, headers: array<string, string>}
+     */
+    public function signNotification(array $payload): array
+    {
+        $raw = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $timestamp = (string) Carbon::now()->getTimestamp();
+
+        return [
+            'raw' => $raw,
+            'headers' => [
+                'x-payment-signature' => hash_hmac('sha256', $timestamp.'.'.$raw, $this->secret),
+                'x-payment-timestamp' => $timestamp,
+            ],
+        ];
+    }
+
     public function refund(Payment $payment, string $amount, string $reason): array
     {
         return [

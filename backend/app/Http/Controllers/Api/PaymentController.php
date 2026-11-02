@@ -14,6 +14,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Services\Notify\NotificationService;
 use App\Services\Payment\PaymentService;
+use App\Services\Payment\SandboxGateway;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -28,6 +29,7 @@ class PaymentController extends Controller
 {
     public function __construct(
         private readonly PaymentService $payments,
+        private readonly SandboxGateway $sandbox,
         private readonly NotificationService $notifications,
     ) {}
 
@@ -102,6 +104,19 @@ class PaymentController extends Controller
             ['order_id' => (int) $order->order_id],
             'order:'.$order->order_id.':pending_ship'
         );
+    }
+
+    /**
+     * 模拟支付成功（仅 sandbox 通道）：给前后端联调与演示用。
+     * 走的是真实验签链路，不是直接改状态，因此不会掩盖回调逻辑缺陷。
+     */
+    public function sandboxPay(Request $request, int $paymentId): JsonResponse
+    {
+        $payment = $this->sandbox->pay((int) $request->user()->user_id, $paymentId);
+
+        $this->notifyPaid($payment);
+
+        return response()->json(['data' => $this->payload($payment, true)]);
     }
 
     /** 查询支付单（仅订单买家或卖家可见） */

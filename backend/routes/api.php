@@ -134,6 +134,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         // 支付（T5）：发起后拿到通道拉起参数
         Route::post('/orders/{order}/payments', [PaymentController::class, 'store'])
             ->whereNumber('order')->name('payments.store');
+        // 沙箱模拟支付（非沙箱通道会明确报错，不会静默改状态）
+        Route::post('/payments/{payment}/sandbox-pay', [PaymentController::class, 'sandboxPay'])
+            ->whereNumber('payment')->name('payments.sandbox_pay');
         Route::get('/payments/{payment}', [PaymentController::class, 'show'])
             ->whereNumber('payment')->name('payments.show');
 
