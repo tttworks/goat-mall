@@ -13,7 +13,7 @@
 | `worker-pricing/` | 行情采集与圖鑑爬虫 Worker | Python 3.12 + FastAPI + Playwright |
 | `app-mobile/` | C 端三端（买家 + 卖家手机后台分包） | uni-app (Vue3 + Vite) |
 | `admin-pc/` | 平台管理后台（PC） | Vue3 + Element Plus + Vite |
-| `docs/` | 项目约定 / 进度日历 / 踩坑记录 | — |
+| `docs/` | 项目约定 / 架构契约 / 架构说明 / 进度日历 / 开发日志 / 踩坑记录 / 软著材料清单 | — |
 
 ## 基础设施（v1.4 定案）
 
@@ -21,7 +21,7 @@
 - 缓存/队列/实时底座：**Redis 7**（PgBouncer 配套连接池）
 - 搜索：Meilisearch
 - 对象存储：UCloud UFile（S3 协议起步）→ 正式期迁腾讯 COS / 阿里 OSS（DB 只存 key）
-- 临时站：#19 东京 216.23.87.130
+- 临时站：东京 BitsFlow 216.23.112.40（`goat.websitedemos.cn`）
 
 ## 开发守则
 
