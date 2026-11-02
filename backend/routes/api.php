@@ -11,11 +11,15 @@
  * 追加时用独立 Route::prefix() 分组，避免与其他 agent 改同一行。
  */
 
+use App\Http\Controllers\Api\Admin\AuctionController as AdminAuctionController;
 use App\Http\Controllers\Api\Admin\CollectorController as AdminCollectorController;
+use App\Http\Controllers\Api\Admin\FeeRuleController as AdminFeeRuleController;
 use App\Http\Controllers\Api\Admin\FigureController as AdminFigureController;
 use App\Http\Controllers\Api\Admin\ListingController as AdminListingController;
 use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
+use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\PostController as AdminPostController;
+use App\Http\Controllers\Api\Admin\RefundController as AdminRefundController;
 use App\Http\Controllers\Api\AuctionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BroadcastAuthController;
@@ -26,12 +30,15 @@ use App\Http\Controllers\Api\FigureController;
 use App\Http\Controllers\Api\FollowController;
 use App\Http\Controllers\Api\IdentityController;
 use App\Http\Controllers\Api\ListingController;
+use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PostController;
+use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\RealtimeController;
+use App\Http\Controllers\Api\RefundController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\SellerAuctionController;
 use App\Http\Controllers\Api\SellerController;
@@ -99,6 +106,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/{figure}', [FigureController::class, 'show'])
             ->where('figure', '[0-9]+|[a-zA-Z0-9\-_]+')
             ->name('show');
+
+        // 行情（T9 读取）：多源概览 + 按天 K 线。只读，无公开写入端点
+        Route::get('/{figure}/quotes', [QuoteController::class, 'summary'])
+            ->whereNumber('figure')->name('quotes');
+        Route::get('/{figure}/kline', [QuoteController::class, 'kline'])
+            ->whereNumber('figure')->name('kline');
     });
 
     // 图鑑管理 + 媒体上传（T3，仅 admin）
@@ -154,6 +167,16 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         Route::post('/auctions/{auction}/bids', [AuctionController::class, 'bid'])
             ->whereNumber('auction')->name('auctions.bid');
+
+        // 售后（T4）：买家申请退款 + 我的退款单；实际退钱在后台审核通过时发生
+        Route::post('/orders/{order}/refunds', [RefundController::class, 'store'])
+            ->whereNumber('order')->name('refunds.store');
+        Route::get('/me/refunds', [RefundController::class, 'index'])->name('refunds.index');
+    });
+
+    // 卖家商品图上传（T4）：卖家上架必须带封面，此前只有 admin 有上传入口
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/seller/media', [MediaController::class, 'storeListingImage'])->name('seller.media.store');
     });
 
     // ---------------- 卖家经营（T4）----------------
@@ -218,7 +241,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->whereNumber('notification')->name('notifications.read');
     });
 
-    // 店铺评价墙（公开）：未登录可看，登录后附带「是否已关注」
+    // 店铺主页 + 评价墙（公开）：未登录可看，登录后附带「是否已关注」
+    Route::get('/sellers/{seller}', [SellerController::class, 'publicShow'])
+        ->whereNumber('seller')->name('sellers.show');
     Route::get('/sellers/{seller}/reviews', [ReviewController::class, 'sellerIndex'])
         ->whereNumber('seller')->name('sellers.reviews');
 
@@ -256,5 +281,34 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/crawl-price', [AdminCollectorController::class, 'crawlPrice'])->name('price');
         Route::get('/job/{job}', [AdminCollectorController::class, 'job'])
             ->where('job', '[A-Za-z0-9\-_]{1,64}')->name('job');
+    });
+
+    // ---------------- 平台经营（T4/T8，仅 admin）----------------
+    // 费率可配、退款可审、订单与竞价全平台可视：这三件事是「运营能自己解决问题」的前提
+    Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/fee-rules', [AdminFeeRuleController::class, 'index'])->name('fee_rules.index');
+        Route::post('/fee-rules', [AdminFeeRuleController::class, 'store'])->name('fee_rules.store');
+        Route::put('/fee-rules/{feeRule}', [AdminFeeRuleController::class, 'update'])
+            ->whereNumber('feeRule')->name('fee_rules.update');
+        Route::delete('/fee-rules/{feeRule}', [AdminFeeRuleController::class, 'destroy'])
+            ->whereNumber('feeRule')->name('fee_rules.destroy');
+        // 试算：后台改完规则立刻能看到「1 万块收多少」，不用真下单
+        Route::get('/fee-quote', [AdminFeeRuleController::class, 'preview'])->name('fee_quote');
+
+        Route::get('/refunds', [AdminRefundController::class, 'index'])->name('refunds.index');
+        Route::post('/refunds/{refund}/review', [AdminRefundController::class, 'review'])
+            ->whereNumber('refund')->name('refunds.review');
+
+        Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');
+        Route::get('/orders/{order}', [AdminOrderController::class, 'show'])
+            ->whereNumber('order')->name('orders.show');
+        Route::patch('/orders/{order}/remark', [AdminOrderController::class, 'remark'])
+            ->whereNumber('order')->name('orders.remark');
+
+        Route::get('/auctions', [AdminAuctionController::class, 'index'])->name('auctions.index');
+        Route::get('/auctions/{auction}', [AdminAuctionController::class, 'show'])
+            ->whereNumber('auction')->name('auctions.show');
+        Route::post('/auctions/{auction}/cancel', [AdminAuctionController::class, 'cancel'])
+            ->whereNumber('auction')->name('auctions.cancel');
     });
 });

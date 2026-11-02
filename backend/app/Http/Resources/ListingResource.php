@@ -10,6 +10,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Listing;
+use App\Models\SellerProfile;
 
 /**
  * 商品出参（公开浏览 / 卖家后台 / 审核队列共用）。
@@ -40,9 +41,23 @@ final class ListingResource
         if ($detail) {
             $data['description'] = $listing->description;
             $data['gallery_urls'] = $listing->galleryUrls();
+            // 卖家编辑需要「原来存的是哪几张」才能做增量保存；只给 key 不给写入权限，
+            // 真正的写入口在 /seller/media，key 本身不是凭证。
+            $data['cover_key'] = $listing->cover_key;
+            $data['gallery_keys'] = $listing->gallery_keys ?? [];
             $data['figure'] = $listing->figure?->only(['figure_id', 'name', 'series', 'maker', 'scale']);
             // 审核与卖家自查需要：驳回原因写在这里，前端不必再查审核流水
             $data['reject_reason'] = ($listing->meta ?? [])['reject_reason'] ?? null;
+
+            // 卖家店铺名片：详情页只有一行，多一次查询可以接受；列表页不查，避免 N+1
+            $shop = SellerProfile::query()->where('user_id', $listing->seller_id)->first();
+            $data['seller'] = [
+                'user_id' => (int) $listing->seller_id,
+                'shop_name' => $shop?->shop_name,
+                'rating' => $shop === null || $shop->rating_bp <= 0 ? null : round($shop->rating_bp / 2000, 1),
+                'sold_count' => $shop?->sold_count,
+                'status' => $shop?->status?->value,
+            ];
         }
 
         return $data;

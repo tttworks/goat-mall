@@ -14,6 +14,7 @@ use App\Exceptions\SocialException;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
+use App\Support\MediaUrl;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
@@ -186,6 +187,8 @@ class ImService
                     'user_id' => $conversation->peerOf($userId),
                     'nickname' => $peer?->nickname,
                     'avatar_key' => $peer?->avatar_key,
+                    // C 端只认 URL：裸 key 在小程序里无法直接渲染
+                    'avatar_url' => MediaUrl::for($peer?->avatar_key),
                 ],
                 'last_message_preview' => $conversation->last_message_preview,
                 'last_message_at' => $conversation->last_message_at?->toIso8601String(),

@@ -40,7 +40,7 @@ class IdentityController
         ]);
     }
 
-    public function submit(SubmitRequest $request): JsonResponse
+    public function submit(IdentitySubmitRequest $request): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();

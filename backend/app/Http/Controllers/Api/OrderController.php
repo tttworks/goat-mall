@@ -10,6 +10,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Order;
+use App\Services\Market\QuoteService;
 use App\Services\Notify\NotificationService;
 use App\Services\Payment\PaymentService;
 use App\Services\Trade\OrderService;
@@ -29,6 +30,7 @@ class OrderController extends Controller
         private readonly OrderService $orders,
         private readonly PaymentService $payments,
         private readonly NotificationService $notifications,
+        private readonly QuoteService $quotes,
     ) {}
 
     public function store(Request $request): JsonResponse
@@ -154,6 +156,9 @@ class OrderController extends Controller
         if ((bool) config('goat.payment.escrow.auto_settle_on_confirm', true)) {
             $this->payments->settleByOrder((int) $order->order_id);
         }
+
+        // 成交价回写行情：recordFromOrder 内部吞异常，行情写失败不影响「已确认收货」这个事实
+        $this->quotes->recordFromOrder($order->load('items'));
 
         $this->notifications->push(
             (int) $order->seller_id,

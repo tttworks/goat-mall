@@ -33,6 +33,7 @@ class AuctionController extends Controller
         ]);
 
         $query = Auction::query()
+            ->with('listing.figure')
             ->where('status', $validated['status'] ?? AuctionStatus::Active->value);
 
         if (! empty($validated['figure_id'])) {
@@ -55,7 +56,7 @@ class AuctionController extends Controller
 
     public function show(int $auctionId): JsonResponse
     {
-        $auction = Auction::query()->whereKey($auctionId)->firstOrFail();
+        $auction = Auction::query()->with('listing.figure')->whereKey($auctionId)->firstOrFail();
 
         return response()->json([
             'data' => $this->payload($auction) + [
@@ -106,13 +107,27 @@ class AuctionController extends Controller
         ], $result['replayed'] ? 200 : 201);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * 竞拍出参：除价格与时间外，必须带「卖的是什么」。
+     * 只给 listing_id 的话，C 端列表页只能凭空渲染一行数字（无标题、无封面），等于空白页。
+     *
+     * @return array<string, mixed>
+     */
     private function payload(Auction $auction): array
     {
+        $listing = $auction->listing;
+        $figure = $listing?->figure;
+
         return [
             'auction_id' => $auction->auction_id,
             'listing_id' => $auction->listing_id,
             'figure_id' => $auction->figure_id,
+            'title' => $listing?->title,
+            'cover_url' => $listing?->coverUrl(),
+            // 列名是 condition_enum（见 create_listings_table），出参字段名统一为 condition
+            'condition' => $listing?->condition_enum,
+            'listing_status' => $listing?->status->value,
+            'figure_name' => $figure?->name,
             'status' => $auction->status->value,
             'status_label' => $auction->status->label(),
             'start_price' => (string) $auction->start_price,

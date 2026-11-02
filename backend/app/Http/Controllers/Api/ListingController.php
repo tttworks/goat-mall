@@ -43,8 +43,10 @@ class ListingController extends Controller
             ->where('stock', '>', 0);
 
         if (! empty($validated['keyword'])) {
+            // whereLike 由 Builder 按驱动生成 ILIKE / LIKE：SQLite 测试库没有 ILIKE 语法，
+            // 直接写 ilike 会在本地与 CI 直接 500（搜索页是 C 端入口，不能只在 PG 上活）
             $keyword = '%'.$validated['keyword'].'%';
-            $query->where(fn ($q) => $q->where('title', 'ilike', $keyword)->orWhere('description', 'ilike', $keyword));
+            $query->where(fn ($q) => $q->whereLike('title', $keyword)->orWhereLike('description', $keyword));
         }
 
         foreach (['figure_id', 'seller_id', 'condition'] as $field) {

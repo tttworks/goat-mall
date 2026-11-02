@@ -9,13 +9,18 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\ListingStatus;
 use App\Enums\SellerStatus;
 use App\Http\Requests\SellerApplyRequest;
 use App\Http\Requests\SellerReviewRequest;
+use App\Models\Listing;
 use App\Models\SellerProfile;
 use App\Models\User;
 use App\Services\Identity\IdentityVerificationService;
 use App\Services\Seller\SellerOnboardingService;
+use App\Services\Social\FollowService;
+use App\Services\Social\ReviewService;
+use App\Support\MediaUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,6 +35,8 @@ class SellerController
     public function __construct(
         private readonly SellerOnboardingService $seller,
         private readonly IdentityVerificationService $identity,
+        private readonly FollowService $follows,
+        private readonly ReviewService $reviews,
     ) {}
 
     public function show(Request $request): JsonResponse
@@ -42,6 +49,54 @@ class SellerController
             'seller' => $profile === null ? null : $this->payload($profile),
             'verification' => $this->identity->latest($user)?->toSafeArray(),
             'next_step' => $this->nextStep($profile),
+        ]);
+    }
+
+    /**
+     * 店铺主页（公开）：买家点商品里的卖家进来看到的就是这一页。
+     *
+     * 与 show() 的区别是「只出可公开字段」——实名状态、驳回理由属于经营内部信息，
+     * 买家不需要也不应该看到。
+     */
+    public function publicShow(Request $request, int $seller): JsonResponse
+    {
+        $profile = SellerProfile::query()->where('user_id', $seller)->first();
+
+        if ($profile === null) {
+            return response()->json(['message' => '店铺不存在'], 404);
+        }
+
+        $summary = $this->reviews->summary($seller);
+
+        // 在售数只算 active：待审/已售的商品出现在店铺页只会误导买家
+        $onSale = Listing::query()
+            ->where('seller_id', $seller)
+            ->where('status', ListingStatus::Active->value)
+            ->count();
+
+        $viewer = $request->user();
+        $isSelf = $viewer !== null && (int) $viewer->user_id === $seller;
+
+        return response()->json([
+            'data' => [
+                'seller_id' => $seller,
+                'shop_name' => $profile->shop_name,
+                'shop_intro' => $profile->shop_intro,
+                'logo_url' => MediaUrl::for($profile->shop_logo_key),
+                'status' => $profile->status->value,
+                'status_label' => $profile->status->label(),
+                // rating_bp 是「5 星 = 10000」的基点，这里同时给 5 分制均值，前端不必各算一遍
+                'rating' => $summary['count'] === 0 ? null : round($profile->rating_bp / 2000, 1),
+                'review_count' => $summary['count'],
+                'sold_count' => $profile->sold_count,
+                'listing_count' => $onSale,
+                'follower_count' => $this->follows->countFollowers($seller),
+                'activated_at' => $profile->activated_at?->toIso8601String(),
+            ],
+            'is_self' => $isSelf,
+            'following' => $isSelf || $viewer === null
+                ? null
+                : $this->follows->isFollowing((int) $viewer->user_id, $seller),
         ]);
     }
 
@@ -131,6 +186,8 @@ class SellerController
     {
         return [
             'seller_id' => $profile->seller_id,
+            // 对外导航（店铺主页 / 评价墙 / 关注）一律用 user_id：这三处的 seller 参数都是卖家账号
+            'user_id' => (int) $profile->user_id,
             'shop_name' => $profile->shop_name,
             'shop_intro' => $profile->shop_intro,
             'shop_logo_key' => $profile->shop_logo_key,

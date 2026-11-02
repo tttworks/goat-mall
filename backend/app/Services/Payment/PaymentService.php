@@ -211,7 +211,9 @@ class PaymentService
 
             $order = Order::query()->whereKey($payment->order_id)->lockForUpdate()->first();
 
-            if ($order !== null && $order->status === OrderStatus::Paid) {
+            // 已付款/已发货/买家已确认（资金仍在我方）都能退；completed 后钱已给卖家，
+            // 走售后协商而不是这里直接退，避免平台垫付。
+            if ($order !== null && $order->status->holdsFunds()) {
                 $order->transitTo(OrderStatus::Refunding, ['remark' => $reason]);
                 $order->transitTo(OrderStatus::Refunded, ['escrow_status' => 'refunded']);
             }
