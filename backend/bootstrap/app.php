@@ -30,6 +30,11 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\ForceJson::class,
         ]);
 
+        // 角色守卫（T2）：路由里写 ->middleware('role:admin')
+        $middleware->alias([
+            'role' => \App\Http\Middleware\EnsureRole::class,
+        ]);
+
         // 反代/Octane 场景下取真实 IP（WAF 与风控依赖）
         $middleware->trustProxies(at: '*', headers: Request::HEADER_X_FORWARDED_FOR
             | Request::HEADER_X_FORWARDED_HOST
@@ -48,6 +53,18 @@ return Application::configure(basePath: dirname(__DIR__))
             report($e);
 
             return response()->json(['message' => $e->getMessage(), 'code' => 'ILLEGAL_STATE_TRANSITION'], 409);
+        });
+
+        // 认证/授权域（T2）：401 凭证失效、403 无权限、409 冲突、502 上游 OAuth 异常
+        $exceptions->render(function (\App\Exceptions\AuthException $e, Request $request) {
+            $status = $e->statusCode;
+
+            // 5xx 类（上游服务故障）需要进告警链路
+            if ($status >= 500) {
+                report($e);
+            }
+
+            return response()->json(['message' => $e->getMessage(), 'code' => $e->errorCode], $status);
         });
     })
     ->create();

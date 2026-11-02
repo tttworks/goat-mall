@@ -9,6 +9,11 @@
 
 namespace App\Providers;
 
+use App\Services\Auth\AppleTokenVerifier;
+use App\Services\Auth\WechatClient;
+use App\Services\Identity\Contracts\IdentityVerifier;
+use App\Services\Identity\Drivers\HttpVerifier;
+use App\Services\Identity\Drivers\NullVerifier;
 use App\Services\Trade\BiddingService;
 use App\Services\Trade\FeeCalculator;
 use App\Services\Trade\OrderService;
@@ -27,6 +32,18 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(FeeCalculator::class);
         $this->app->singleton(OrderService::class);
         $this->app->singleton(BiddingService::class);
+
+        // 认证域（T2）：OAuth 客户端无状态，可安全单例
+        $this->app->singleton(WechatClient::class);
+        $this->app->singleton(AppleTokenVerifier::class);
+
+        // 实名核身驱动按配置解析：换服务商只改 GOAT_IDENTITY_DRIVER，业务代码不动
+        $this->app->bind(IdentityVerifier::class, function (): IdentityVerifier {
+            return match ((string) config('goat_auth.identity.driver', 'null')) {
+                'http' => new HttpVerifier,
+                default => new NullVerifier,
+            };
+        });
     }
 
     public function boot(): void

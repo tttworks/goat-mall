@@ -12,11 +12,52 @@
  */
 
 use App\Http\Controllers\Api\AuctionController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\IdentityController;
 use App\Http\Controllers\Api\ListingController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\SellerController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->name('api.v1.')->group(function () {
+
+    // ---------------- 认证与用户（T2）----------------
+    Route::prefix('auth')->name('auth.')->group(function () {
+        // 公开通道（按 IP 限流，防撞库）
+        Route::post('/register', [AuthController::class, 'register'])
+            ->middleware('throttle:'.config('goat_auth.throttle.register', '5,1'))
+            ->name('register');
+        Route::post('/login', [AuthController::class, 'login'])
+            ->middleware('throttle:'.config('goat_auth.throttle.login', '10,1'))
+            ->name('login');
+        Route::post('/wechat', [AuthController::class, 'wechat'])
+            ->middleware('throttle:'.config('goat_auth.throttle.provider', '20,1'))
+            ->name('wechat');
+        Route::post('/apple', [AuthController::class, 'apple'])
+            ->middleware('throttle:'.config('goat_auth.throttle.provider', '20,1'))
+            ->name('apple');
+
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::get('/me', [AuthController::class, 'me'])->name('me');
+            Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+        });
+    });
+
+    // 卖家开店 + 实名核身（T2）
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/seller', [SellerController::class, 'show'])->name('seller.show');
+        Route::post('/seller/apply', [SellerController::class, 'apply'])->name('seller.apply');
+
+        Route::get('/identity', [IdentityController::class, 'show'])->name('identity.show');
+        Route::post('/identity', [IdentityController::class, 'submit'])->name('identity.submit');
+    });
+
+    // 后台审核（T2，仅 admin）
+    Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::post('/sellers/{seller}/review', [SellerController::class, 'review'])
+            ->whereNumber('seller')->name('sellers.review');
+    });
+
     // 商品浏览（公开）
     Route::get('/listings', [ListingController::class, 'index'])->name('listings.index');
     Route::get('/listings/{listing}', [ListingController::class, 'show'])
