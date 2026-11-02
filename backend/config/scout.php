@@ -15,7 +15,8 @@ return [
 
     'prefix' => env('SCOUT_PREFIX', 'goat_'),
 
-    'queue' => env('SCOUT_QUEUE', false),
+    // 默认入队：Meili 抖动时后台保存图鑑/商品不应直接 500，索引延后补齐即可
+    'queue' => env('SCOUT_QUEUE', true),
 
     'after_commit' => true,
 

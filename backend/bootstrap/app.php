@@ -66,5 +66,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return response()->json(['message' => $e->getMessage(), 'code' => $e->errorCode], $status);
         });
+
+        // 图鑑/媒体域（T3）：404 未发布、409 slug 冲突、422 非法入参、503 存储不可用
+        $exceptions->render(function (\App\Exceptions\CatalogException $e, Request $request) {
+            if ($e->statusCode >= 500) {
+                report($e);
+            }
+
+            return response()->json(['message' => $e->getMessage(), 'code' => $e->errorCode], $e->statusCode);
+        });
     })
     ->create();

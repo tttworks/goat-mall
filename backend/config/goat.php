@@ -18,6 +18,10 @@ return [
     'media' => [
         'base_url' => env('MEDIA_BASE_URL', ''),
         'disk' => env('MEDIA_DISK', 'ufile'),
+        // 直传签名有效期（分钟）：太短编辑器来不及传，太长等于给了长期写权限
+        'presign_ttl' => (int) env('MEDIA_PRESIGN_TTL', 15),
+        // 允许上传的业务目录白名单（顺序即后台选择器顺序）
+        'folders' => ['figures', 'listings', 'posts', 'avatars'],
     ],
 
     // 交易域（T4）

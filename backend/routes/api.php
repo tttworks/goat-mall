@@ -15,6 +15,9 @@ use App\Http\Controllers\Api\AuctionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\IdentityController;
 use App\Http\Controllers\Api\ListingController;
+use App\Http\Controllers\Api\Admin\FigureController as AdminFigureController;
+use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
+use App\Http\Controllers\Api\FigureController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\SellerController;
 use Illuminate\Support\Facades\Route;
@@ -56,6 +59,32 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::post('/sellers/{seller}/review', [SellerController::class, 'review'])
             ->whereNumber('seller')->name('sellers.review');
+    });
+
+    // ---------------- 图鑑（T3）----------------
+    Route::prefix('figures')->name('figures.')->group(function () {
+        Route::get('/', [FigureController::class, 'index'])->name('index');
+        // 详情支持 id 或 slug：站内跳转用 id，分享链接用 slug
+        Route::get('/{figure}', [FigureController::class, 'show'])
+            ->where('figure', '[0-9]+|[a-zA-Z0-9\-_]+')
+            ->name('show');
+    });
+
+    // 图鑑管理 + 媒体上传（T3，仅 admin）
+    Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/figures', [AdminFigureController::class, 'index'])->name('figures.index');
+        Route::post('/figures', [AdminFigureController::class, 'store'])->name('figures.store');
+        Route::get('/figures/{figure}', [AdminFigureController::class, 'show'])
+            ->whereNumber('figure')->name('figures.show');
+        Route::put('/figures/{figure}', [AdminFigureController::class, 'update'])
+            ->whereNumber('figure')->name('figures.update');
+        Route::patch('/figures/{figure}/status', [AdminFigureController::class, 'updateStatus'])
+            ->whereNumber('figure')->name('figures.status');
+        Route::delete('/figures/{figure}', [AdminFigureController::class, 'destroy'])
+            ->whereNumber('figure')->name('figures.destroy');
+
+        Route::post('/media/presign', [AdminMediaController::class, 'presign'])->name('media.presign');
+        Route::post('/media', [AdminMediaController::class, 'store'])->name('media.store');
     });
 
     // 商品浏览（公开）
