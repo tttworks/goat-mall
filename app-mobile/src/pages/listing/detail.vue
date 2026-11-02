@@ -62,7 +62,7 @@
       </view>
 
       <view class="detail__notice">
-        <text class="g-dim">担保说明：付款后资金由平台冻结，收到货确认无误才结算给卖家；卖家 3 日内未发货可取消。</text>
+        <text class="g-dim">担保说明：付款后资金由平台冻结，收到货确认无误才结算给卖家；卖家超时未发货会在付款 3 天后提醒双方，届时可申请退款。发货 {{ autoConfirmDays }} 天后未确认收货，系统将自动确认并结算。</text>
       </view>
     </view>
 
@@ -111,6 +111,9 @@ const submitting = ref(false)
 const favorited = ref(false)
 const following = ref(false)
 const address = ref(null)
+
+// 与后端 config('goat.trade.auto_confirm_days') 的默认值一致；改配置时同步改这句文案
+const autoConfirmDays = 10
 
 const gallery = computed(() => {
   if (!listing.value) return []
