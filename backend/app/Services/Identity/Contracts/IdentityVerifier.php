@@ -14,7 +14,7 @@ use App\Services\Identity\IdentityCheckResult;
 /**
  * 实名核身驱动契约（T2）。
  *
- * 换服务商只实现本接口并在 config/goat_auth.php 切 driver，业务代码零改动。
+ * 换服务商只实现本接口并在 config/goat.auth.php 切 driver，业务代码零改动。
  * 实现方**不得**自行落库、不得打日志带证件号明文。
  */
 interface IdentityVerifier

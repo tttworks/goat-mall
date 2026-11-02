@@ -7,7 +7,7 @@
  * 本文件为 GOAT 自有代码；第三方框架（Laravel / uni-app / 等）版权归各自权利人。
  */
 
-namespace App\Http\Requests\Seller;
+namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -18,7 +18,7 @@ use Illuminate\Foundation\Http\FormRequest;
  * 拆成两步会让用户在两个页面间来回，且容易出现"开了店没实名"的空档。
  * `agree_terms` 为必勾：卖家协议是纠纷处理依据，必须留证。
  */
-class ApplyRequest extends FormRequest
+class SellerApplyRequest extends FormRequest
 {
     public function authorize(): bool
     {

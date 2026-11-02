@@ -10,8 +10,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\SellerStatus;
-use App\Http\Requests\Seller\ApplyRequest;
-use App\Http\Requests\Seller\ReviewRequest;
+use App\Http\Requests\SellerApplyRequest;
+use App\Http\Requests\SellerReviewRequest;
 use App\Models\SellerProfile;
 use App\Models\User;
 use App\Services\Identity\IdentityVerificationService;
@@ -45,7 +45,7 @@ class SellerController
         ]);
     }
 
-    public function apply(ApplyRequest $request): JsonResponse
+    public function apply(SellerApplyRequest $request): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -74,7 +74,7 @@ class SellerController
     }
 
     /** 后台审核（admin）：approve / reject / suspend */
-    public function review(ReviewRequest $request, SellerProfile $seller): JsonResponse
+    public function review(SellerReviewRequest $request, SellerProfile $seller): JsonResponse
     {
         $decision = (string) $request->input('decision');
         $reason = (string) $request->input('reason', '');

@@ -10,10 +10,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\AuthProvider;
-use App\Http\Requests\Auth\AppleLoginRequest;
-use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Requests\Auth\RegisterRequest;
-use App\Http\Requests\Auth\WechatLoginRequest;
+use App\Http\Requests\AuthAppleLoginRequest;
+use App\Http\Requests\AuthLoginRequest;
+use App\Http\Requests\AuthRegisterRequest;
+use App\Http\Requests\AuthWechatLoginRequest;
 use App\Models\User;
 use App\Services\Auth\AuthService;
 use Illuminate\Http\JsonResponse;
@@ -29,7 +29,7 @@ class AuthController
 {
     public function __construct(private readonly AuthService $auth) {}
 
-    public function register(RegisterRequest $request): JsonResponse
+    public function register(AuthRegisterRequest $request): JsonResponse
     {
         $user = $this->auth->register(
             $request->safe()->only(['username', 'email', 'password', 'nickname', 'locale']),
@@ -39,7 +39,7 @@ class AuthController
         return $this->issued($user, $request->input('device_name'));
     }
 
-    public function login(LoginRequest $request): JsonResponse
+    public function login(AuthLoginRequest $request): JsonResponse
     {
         $user = $this->auth->login(
             (string) $request->input('login'),
@@ -50,7 +50,7 @@ class AuthController
         return $this->issued($user, $request->input('device_name'));
     }
 
-    public function wechat(WechatLoginRequest $request): JsonResponse
+    public function wechat(AuthWechatLoginRequest $request): JsonResponse
     {
         $user = $this->auth->loginWithWechat(
             (string) $request->input('code'),
@@ -61,7 +61,7 @@ class AuthController
         return $this->issued($user, $request->input('device_name'));
     }
 
-    public function apple(AppleLoginRequest $request): JsonResponse
+    public function apple(AuthAppleLoginRequest $request): JsonResponse
     {
         $user = $this->auth->loginWithApple(
             (string) $request->input('identity_token'),
@@ -113,7 +113,7 @@ class AuthController
     private function issued(User $user, ?string $deviceName): JsonResponse
     {
         $token = $this->auth->issueToken($user, $deviceName);
-        $ttl = (int) config('goat_auth.token.ttl_minutes', 43200);
+        $ttl = (int) config('goat.auth.token.ttl_minutes', 43200);
 
         return response()->json([
             'token' => $token,

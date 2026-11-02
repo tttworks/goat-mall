@@ -39,7 +39,7 @@ class AppServiceProvider extends ServiceProvider
 
         // 实名核身驱动按配置解析：换服务商只改 GOAT_IDENTITY_DRIVER，业务代码不动
         $this->app->bind(IdentityVerifier::class, function (): IdentityVerifier {
-            return match ((string) config('goat_auth.identity.driver', 'null')) {
+            return match ((string) config('goat.auth.identity.driver', 'null')) {
                 'http' => new HttpVerifier,
                 default => new NullVerifier,
             };

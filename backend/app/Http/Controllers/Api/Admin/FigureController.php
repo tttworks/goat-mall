@@ -11,8 +11,8 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Enums\FigureCategory;
 use App\Enums\FigureStatus;
-use App\Http\Requests\Catalog\FigureStoreRequest;
-use App\Http\Requests\Catalog\FigureUpdateRequest;
+use App\Http\Requests\FigureStoreRequest;
+use App\Http\Requests\FigureUpdateRequest;
 use App\Http\Resources\FigureResource;
 use App\Models\Figure;
 use App\Services\Catalog\FigureSearchService;

@@ -7,16 +7,14 @@
  * 本文件为 GOAT 自有代码；第三方框架（Laravel / uni-app / 等）版权归各自权利人。
  */
 
-namespace App\Http\Requests\Seller;
+namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
- * 店铺审核入参（T2，仅 admin）。
- * 驳回/封禁必须给理由：理由是卖家申诉与客服沟通的唯一依据。
+ * 密码登录入参（T2）。`login` 同时接受用户名与邮箱，服务端自行判断。
  */
-class ReviewRequest extends FormRequest
+class AuthLoginRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -26,16 +24,17 @@ class ReviewRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'decision' => ['required', 'string', Rule::in(['approve', 'reject', 'suspend'])],
-            'reason' => ['nullable', 'string', 'max:255', 'required_unless:decision,approve'],
+            'login' => ['required', 'string', 'max:120'],
+            'password' => ['required', 'string', 'max:64'],
+            'device_name' => ['nullable', 'string', 'max:64'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'decision.required' => '请选择审核结果',
-            'reason.required_unless' => '驳回或封禁必须填写原因',
+            'login.required' => '请输入用户名或邮箱',
+            'password.required' => '请输入密码',
         ];
     }
 }

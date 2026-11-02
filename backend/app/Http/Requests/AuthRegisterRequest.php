@@ -7,7 +7,7 @@
  * 本文件为 GOAT 自有代码；第三方框架（Laravel / uni-app / 等）版权归各自权利人。
  */
 
-namespace App\Http\Requests\Auth;
+namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -19,7 +19,7 @@ use Illuminate\Foundation\Http\FormRequest;
  *  - 用户名限制 `alpha_dash`：避免与邮箱/手机号形态混淆，也方便后续 @提及；
  *  - 密码 8~64 位且必须 confirmed：前端两次输入一致，减少客服工单。
  */
-class RegisterRequest extends FormRequest
+class AuthRegisterRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -28,7 +28,7 @@ class RegisterRequest extends FormRequest
 
     public function rules(): array
     {
-        $min = (int) config('goat_auth.password.min', 8);
+        $min = (int) config('goat.auth.password.min', 8);
 
         return [
             'username' => ['nullable', 'string', 'min:3', 'max:32', 'alpha_dash'],

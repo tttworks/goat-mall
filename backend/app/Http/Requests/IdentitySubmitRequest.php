@@ -7,14 +7,14 @@
  * 本文件为 GOAT 自有代码；第三方框架（Laravel / uni-app / 等）版权归各自权利人。
  */
 
-namespace App\Http\Requests\Auth;
+namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * 密码登录入参（T2）。`login` 同时接受用户名与邮箱，服务端自行判断。
+ * 实名核身提交（T2）。证件号仅在本请求生命周期内以明文存在，落库前加密 + HMAC。
  */
-class LoginRequest extends FormRequest
+class IdentitySubmitRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -24,17 +24,16 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'login' => ['required', 'string', 'max:120'],
-            'password' => ['required', 'string', 'max:64'],
-            'device_name' => ['nullable', 'string', 'max:64'],
+            'real_name' => ['required', 'string', 'min:2', 'max:32'],
+            'id_number' => ['required', 'string', 'min:5', 'max:32'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'login.required' => '请输入用户名或邮箱',
-            'password.required' => '请输入密码',
+            'real_name.required' => '请填写真实姓名',
+            'id_number.required' => '请填写证件号',
         ];
     }
 }

@@ -276,7 +276,7 @@ class AuthService
     /** 签发 Sanctum Token；返回明文（仅此一次可见） */
     public function issueToken(User $user, ?string $deviceName = null): string
     {
-        $ttl = (int) config('goat_auth.token.ttl_minutes', 43200); // 默认 30 天：C 端低频访问，过短体验差
+        $ttl = (int) config('goat.auth.token.ttl_minutes', 43200); // 默认 30 天：C 端低频访问，过短体验差
         $expiresAt = $ttl > 0 ? now()->addMinutes($ttl) : null;
 
         return $user->createToken($deviceName ?: 'goat-api', ['*'], $expiresAt)->plainTextToken;

@@ -152,7 +152,7 @@ class IdentityVerificationService
     /** HMAC-SHA256：不可逆、不可跨环境比对，仅用于号内去重 */
     private function hashIdNumber(string $normalized): string
     {
-        $salt = (string) config('goat_auth.identity.hash_salt', (string) config('app.key', 'goat'));
+        $salt = (string) config('goat.auth.identity.hash_salt', (string) config('app.key', 'goat'));
 
         return hash_hmac('sha256', $normalized, $salt);
     }

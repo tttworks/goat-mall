@@ -7,7 +7,7 @@
  * 本文件为 GOAT 自有代码；第三方框架（Laravel / uni-app / 等）版权归各自权利人。
  */
 
-namespace App\Http\Requests\Auth;
+namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -15,7 +15,7 @@ use Illuminate\Foundation\Http\FormRequest;
  * 微信小程序登录入参（T2）：前端 `wx.login()` 拿到的 code，服务端换 openid。
  * 注意：**不接受前端直传 openid**（否则可伪造任意用户身份）。
  */
-class WechatLoginRequest extends FormRequest
+class AuthWechatLoginRequest extends FormRequest
 {
     public function authorize(): bool
     {

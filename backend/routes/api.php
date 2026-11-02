@@ -28,16 +28,16 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::prefix('auth')->name('auth.')->group(function () {
         // 公开通道（按 IP 限流，防撞库）
         Route::post('/register', [AuthController::class, 'register'])
-            ->middleware('throttle:'.config('goat_auth.throttle.register', '5,1'))
+            ->middleware('throttle:'.config('goat.auth.throttle.register', '5,1'))
             ->name('register');
         Route::post('/login', [AuthController::class, 'login'])
-            ->middleware('throttle:'.config('goat_auth.throttle.login', '10,1'))
+            ->middleware('throttle:'.config('goat.auth.throttle.login', '10,1'))
             ->name('login');
         Route::post('/wechat', [AuthController::class, 'wechat'])
-            ->middleware('throttle:'.config('goat_auth.throttle.provider', '20,1'))
+            ->middleware('throttle:'.config('goat.auth.throttle.provider', '20,1'))
             ->name('wechat');
         Route::post('/apple', [AuthController::class, 'apple'])
-            ->middleware('throttle:'.config('goat_auth.throttle.provider', '20,1'))
+            ->middleware('throttle:'.config('goat.auth.throttle.provider', '20,1'))
             ->name('apple');
 
         Route::middleware('auth:sanctum')->group(function () {

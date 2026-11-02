@@ -11,7 +11,7 @@ use Laravel\Sanctum\Sanctum;
 
 /**
  * Sanctum（T2）：C 端用 Bearer Token，PC 后台用 SPA Cookie 会话。
- * Token 绝对过期时间由 goat_auth.token.ttl_minutes 控制（签发时传入），此处留 null 表示不叠加限制。
+ * Token 绝对过期时间由 goat.auth.token.ttl_minutes 控制（签发时传入），此处留 null 表示不叠加限制。
  */
 return [
 

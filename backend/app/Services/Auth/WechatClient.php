@@ -26,15 +26,15 @@ class WechatClient
      */
     public function code2Session(string $code): array
     {
-        $appId = (string) config('goat_auth.wechat.app_id');
-        $secret = (string) config('goat_auth.wechat.app_secret');
+        $appId = (string) config('goat.auth.wechat.app_id');
+        $secret = (string) config('goat.auth.wechat.app_secret');
 
         if ($appId === '' || $secret === '') {
             throw AuthException::provider('微信登录未配置（缺少 WECHAT_APP_ID / APP_SECRET）', 500);
         }
 
         try {
-            $response = Http::timeout((int) config('goat_auth.wechat.timeout', 5))
+            $response = Http::timeout((int) config('goat.auth.wechat.timeout', 5))
                 ->retry(2, 200)
                 ->get('https://api.weixin.qq.com/sns/jscode2session', [
                     'appid' => $appId,

@@ -71,13 +71,13 @@ class AppleTokenVerifier
 
     private function assertClaims(array $claims): void
     {
-        $issuer = (string) config('goat_auth.apple.issuer', 'https://appleid.apple.com');
+        $issuer = (string) config('goat.auth.apple.issuer', 'https://appleid.apple.com');
 
         if (($claims['iss'] ?? null) !== $issuer) {
             throw AuthException::unauthorized('Apple 令牌签发方不正确');
         }
 
-        $audience = (string) config('goat_auth.apple.client_id');
+        $audience = (string) config('goat.auth.apple.client_id');
 
         if ($audience !== '' && ($claims['aud'] ?? null) !== $audience) {
             throw AuthException::unauthorized('Apple 令牌受众不匹配');
@@ -117,8 +117,8 @@ class AppleTokenVerifier
             Cache::forget($cacheKey);
         }
 
-        return Cache::remember($cacheKey, (int) config('goat_auth.apple.jwks_ttl', 43200), function (): array {
-            $url = (string) config('goat_auth.apple.jwks_url', 'https://appleid.apple.com/auth/keys');
+        return Cache::remember($cacheKey, (int) config('goat.auth.apple.jwks_ttl', 43200), function (): array {
+            $url = (string) config('goat.auth.apple.jwks_url', 'https://appleid.apple.com/auth/keys');
 
             try {
                 $response = Http::timeout(5)->retry(2, 200)->get($url);

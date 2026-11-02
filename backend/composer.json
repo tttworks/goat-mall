@@ -3,6 +3,12 @@
     "description": "GOAT 潮玩交易平台 · 站点系统后端（Laravel 12 + Octane + Reverb + Horizon）",
     "type": "project",
     "license": "proprietary",
+    "authors": [
+        {
+            "name": "Aloysius Luo",
+            "role": "Author"
+        }
+    ],
     "require": {
         "php": "^8.3",
         "laravel/framework": "^12.0",
@@ -53,6 +59,11 @@
         "optimize-autoloader": true,
         "preferred-install": "dist",
         "sort-packages": true
+    },
+    "extra": {
+        "project": "GOAT 潮玩交易平台",
+        "copyright": "Copyright © 火山文化科技（天津市火山文化科技有限责任公司）",
+        "author": "Aloysius Luo"
     },
     "minimum-stability": "stable",
     "prefer-stable": true

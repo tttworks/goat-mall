@@ -9,7 +9,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
-use App\Http\Requests\Catalog\MediaPresignRequest;
+use App\Http\Requests\MediaPresignRequest;
 use App\Services\Catalog\MediaPresigner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

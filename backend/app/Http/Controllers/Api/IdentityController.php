@@ -9,7 +9,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Requests\Identity\SubmitRequest;
+use App\Http\Requests\IdentitySubmitRequest;
 use App\Models\User;
 use App\Services\Identity\IdentityVerificationService;
 use App\Services\Seller\SellerOnboardingService;

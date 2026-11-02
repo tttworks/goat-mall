@@ -7,7 +7,7 @@
  * 本文件为 GOAT 自有代码；第三方框架（Laravel / uni-app / 等）版权归各自权利人。
  */
 
-namespace App\Http\Requests\Auth;
+namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -15,7 +15,7 @@ use Illuminate\Foundation\Http\FormRequest;
  * Apple 登录入参（T2）：iOS 端 `ASAuthorizationAppleIDCredential.identityToken`（JWT）。
  * 服务端必须验签，见 App\Services\Auth\AppleTokenVerifier。
  */
-class AppleLoginRequest extends FormRequest
+class AuthAppleLoginRequest extends FormRequest
 {
     public function authorize(): bool
     {

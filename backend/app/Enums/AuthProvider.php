@@ -41,7 +41,7 @@ enum AuthProvider: string
     /** 是否当前启用（phone 预留，配置可一键开关） */
     public function enabled(): bool
     {
-        return (bool) config('goat_auth.channels.'.$this->value, false);
+        return (bool) config('goat.auth.channels.'.$this->value, false);
     }
 
     /** @return array<int, string> */

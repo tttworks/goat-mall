@@ -31,14 +31,14 @@ class HttpVerifier implements IdentityVerifier
 
     public function verify(string $realName, string $idNumber): IdentityCheckResult
     {
-        $baseUrl = rtrim((string) config('goat_auth.identity.base_url', ''), '/');
-        $key = (string) config('goat_auth.identity.key', '');
+        $baseUrl = rtrim((string) config('goat.auth.identity.base_url', ''), '/');
+        $key = (string) config('goat.auth.identity.key', '');
 
         if ($baseUrl === '' || $key === '') {
             throw new RuntimeException('未配置实名核身服务地址或密钥（IDENTITY_BASE_URL / IDENTITY_KEY）');
         }
 
-        $response = Http::timeout((int) config('goat_auth.identity.timeout', 8))
+        $response = Http::timeout((int) config('goat.auth.identity.timeout', 8))
             ->withHeaders([
                 'X-Goat-Key' => $key,
                 'X-Goat-Request-Id' => (string) \Illuminate\Support\Str::uuid(),
