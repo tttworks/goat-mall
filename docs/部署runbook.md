@@ -78,3 +78,29 @@ systemctl restart goat-octane  # T1 产出的 unit
 - 落地前**互知窗口**：CodeBuddy 跑迁移 / 部署时，WorkBuddy 不同步做镜像数据导入（两者都写服务器，错峰避免锁 / 状态冲突）。
 - 服务器结构改动（PHP 版本、数据层、Octane unit）先读 `项目约定.md` §4 / §9，不确定问 WorkBuddy。
 - 部署上下文的权威源是 WorkBuddy；本 runbook 与其冲突以 `项目约定.md` 为准。
+
+## 6. 临时站部署记录（2026-11-03 首次发布，可直接照此复现）
+
+- 站点：`https://goat.websitedemos.cn`（Let's Encrypt，2027-01-31 到期）
+- 代码根：`/www/wwwroot/goat.websitedemos.cn`；Laravel 在 `backend/`，站点根目录指向 `backend/public`
+- nginx：`/www/server/panel/vhost/nginx/goat.websitedemos.cn.conf`（改动前已备份到 `/root/goat.vhost.bak.*`）
+  - `/api`、`/healthz`、`/up` → `http://127.0.0.1:8000`（Octane）
+  - `/admin/` → `try_files $uri $uri/ /admin/index.html`（Vite history 回落，`VITE_APP_BASE=/admin/`）
+  - 80 → 443 强制跳转
+- systemd：`goat-octane.service`（`octane:start --server=swoole --host=127.0.0.1 --port=8000 --workers=4`）、`goat-queue.service`（`queue:work redis --tries=3 --max-time=3600`）
+- 宝塔 PHP CLI：`/www/server/php/83/bin/php`；composer 必须 `php -d disable_functions= /usr/local/bin/composer2`（宝塔默认禁用 `putenv` / `proc_open`，composer 起不来）
+- `.env` 由部署脚本现场生成（`.env.example` 不被 git 跟踪）：PG 直连 `127.0.0.1:5432`（绕开 PgBouncer 端口），`APP_DEBUG=false`，管理员密码从 `/root/goat_secrets.env` 取
+- 发布后自检（缺一不可）：
+  1. `systemctl is-active goat-octane goat-queue` 均 active
+  2. `POST /api/v1/auth/login` 拿 token → `auth/me`、`notifications`、`admin/figures`、`admin/reports`、`admin/posts`、`posts` 全 200，不带 token 访问 `admin/figures` 401
+  3. feed 带 token 时 `liked` 为布尔值（造一条临时帖 + 点赞验证后清理）
+  4. `/healthz`、`/up`、`/admin/` 均 200；`routes/web.php` 无临时调试路由
+  5. `git status` 仅含本次发布应有改动；测试时产生的 token 全部删除
+- 现状提醒：该目录是 tar 覆盖上传，**不是 git 仓库**，`git pull` 会失败；切 git 部署前先决策。`systemctl is-active nginx` 报 inactive 是正常的（宝塔直接拉起 master 进程）。
+
+## 7. 排障：部署后「登录成功但所有带 token 请求 401」
+
+- 先看 `backend/config/octane.php` 的 `listeners` 是否完整（`RequestReceived` 必须展开两个 `prepareApplicationFor...`；`FlushTemporaryContainerInstances` 必须在 `OperationTerminated`）
+- 修复后必须 `php artisan config:clear && config:cache && route:cache` + `php -d disable_functions= artisan octane:reload`，只 reload 旧配置无效
+- 想看真实异常再临时开 `APP_DEBUG=true`，**调完立刻改回 false 并重建缓存**（本次发布踩过）
+- 详细成因见 `踩坑记录.md` §19 / §20
