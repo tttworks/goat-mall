@@ -41,7 +41,12 @@ class FigureService
         $payload = $this->normalize($data);
         $payload['slug'] = $this->uniqueSlug($payload['slug'] ?? $payload['name']);
 
-        if (($payload['status'] ?? FigureStatus::Draft->value) === FigureStatus::Published->value) {
+        // 显式补默认值：PG 靠 INSERT..RETURNING 回填库默认列，SQLite 不回填，
+        // 不补的话新建对象 status 为 null，出参读 ->value 直接 500（测试环境才暴露）
+        $payload['status'] ??= FigureStatus::Draft->value;
+        $payload['category'] ??= FigureCategory::Other->value;
+
+        if ($payload['status'] === FigureStatus::Published->value) {
             $payload['published_at'] = now();
         }
 
@@ -266,8 +271,12 @@ class FigureService
     {
         $slug = Str::slug($base);
 
+        // 纯数字 slug 会与 figure_id 撞空间：中文名转写后可能只剩数字（如「… 1/7」→ 17），
+        // 详情页按数字优先判 id，这类条目将永远 404，必须加前缀区分
         if ($slug === '') {
             $slug = 'figure-'.Str::lower(Str::random(8));
+        } elseif (ctype_digit($slug)) {
+            $slug = 'figure-'.$slug;
         }
 
         $slug = Str::limit($slug, 120, '');

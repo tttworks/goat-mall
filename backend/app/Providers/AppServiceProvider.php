@@ -14,6 +14,9 @@ use App\Services\Auth\WechatClient;
 use App\Services\Identity\Contracts\IdentityVerifier;
 use App\Services\Identity\Drivers\HttpVerifier;
 use App\Services\Identity\Drivers\NullVerifier;
+use App\Services\Payment\Contracts\PaymentChannel;
+use App\Services\Payment\Drivers\SandboxChannel;
+use App\Services\Payment\PaymentService;
 use App\Services\Trade\BiddingService;
 use App\Services\Trade\FeeCalculator;
 use App\Services\Trade\OrderService;
@@ -44,6 +47,18 @@ class AppServiceProvider extends ServiceProvider
                 default => new NullVerifier,
             };
         });
+
+        // 支付通道（T5）：sandbox 与真实收付通实现同一契约，业务层不感知
+        $this->app->bind(PaymentChannel::class, function (): PaymentChannel {
+            return match ((string) config('goat.payment.channel', 'sandbox')) {
+                default => new SandboxChannel(
+                    (string) config('goat.payment.sandbox.secret'),
+                    (int) config('goat.payment.sandbox.notify_tolerance', 300),
+                ),
+            };
+        });
+
+        $this->app->singleton(PaymentService::class);
     }
 
     public function boot(): void

@@ -10,6 +10,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Order;
+use App\Services\Payment\PaymentService;
 use App\Services\Trade\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +24,10 @@ use Illuminate\Validation\Rule;
  */
 class OrderController extends Controller
 {
-    public function __construct(private readonly OrderService $orders) {}
+    public function __construct(
+        private readonly OrderService $orders,
+        private readonly PaymentService $payments,
+    ) {}
 
     public function store(Request $request): JsonResponse
     {
@@ -134,6 +138,11 @@ class OrderController extends Controller
     public function confirm(Request $request, int $orderId): JsonResponse
     {
         $order = $this->orders->confirmReceipt((int) $request->user()->user_id, $orderId);
+
+        // 订单确认与资金结算分属两个服务：这里做编排，谁失败谁回滚自己的事务
+        if ((bool) config('goat.payment.escrow.auto_settle_on_confirm', true)) {
+            $this->payments->settleByOrder((int) $order->order_id);
+        }
 
         return response()->json(['data' => $this->payload($order, true)]);
     }

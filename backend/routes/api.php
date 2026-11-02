@@ -20,12 +20,19 @@ use App\Http\Controllers\Api\FigureController;
 use App\Http\Controllers\Api\IdentityController;
 use App\Http\Controllers\Api\ListingController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\SellerAuctionController;
 use App\Http\Controllers\Api\SellerController;
 use App\Http\Controllers\Api\SellerListingController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->name('api.v1.')->group(function () {
+
+    // ---------------- 支付回调（T5）----------------
+    // 渠道服务器不会带用户 Token，身份完全由签名证明；限流防刷但不过严，避免渠道重试被拦
+    Route::post('/payments/notify', [PaymentController::class, 'notify'])
+        ->middleware('throttle:120,1')
+        ->name('payments.notify');
 
     // ---------------- 认证与用户（T2）----------------
     Route::prefix('auth')->name('auth.')->group(function () {
@@ -114,6 +121,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->whereNumber('order')->name('orders.ship');
         Route::post('/orders/{order}/confirm', [OrderController::class, 'confirm'])
             ->whereNumber('order')->name('orders.confirm');
+
+        // 支付（T5）：发起后拿到通道拉起参数
+        Route::post('/orders/{order}/payments', [PaymentController::class, 'store'])
+            ->whereNumber('order')->name('payments.store');
+        Route::get('/payments/{payment}', [PaymentController::class, 'show'])
+            ->whereNumber('payment')->name('payments.show');
 
         Route::post('/auctions/{auction}/bids', [AuctionController::class, 'bid'])
             ->whereNumber('auction')->name('auctions.bid');

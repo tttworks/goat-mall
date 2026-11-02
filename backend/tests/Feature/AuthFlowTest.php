@@ -91,6 +91,10 @@ class AuthFlowTest extends TestCase
             ->postJson('/api/v1/auth/logout')
             ->assertOk();
 
+        // 同一测试进程里 Auth guard 会缓存已解析用户，不清理会沿用上一请求的身份，
+        // 导致「已注销仍 200」的假失败（真实 HTTP 每请求新进程，不存在该问题）
+        $this->app['auth']->forgetGuards();
+
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/v1/auth/me')
             ->assertStatus(401);

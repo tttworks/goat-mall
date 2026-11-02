@@ -63,11 +63,15 @@ class FigureController extends Controller
             ->published()
             ->with('sources')
             ->withCount('listings')
-            ->when(
-                ctype_digit($figure),
-                fn ($query) => $query->where('figure_id', (int) $figure),
-                fn ($query) => $query->where('slug', $figure),
-            )
+            // 数字串同时按 id 与 slug 匹配：历史数据里可能存在纯数字 slug，
+            // 只认 id 会让这批条目彻底打不开
+            ->where(function ($query) use ($figure) {
+                $query->where('slug', $figure);
+
+                if (ctype_digit($figure)) {
+                    $query->orWhere('figure_id', (int) $figure);
+                }
+            })
             ->first();
 
         if ($record === null) {

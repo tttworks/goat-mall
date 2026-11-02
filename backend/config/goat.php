@@ -103,6 +103,26 @@ return [
 
     ],
 
+    // 支付与担保交易（T5）。零采购：无商户号时 channel=sandbox，签名密钥自己定。
+    'payment' => [
+
+        // 通道：sandbox（本地/联调）/ wechat（收付通，商户号下来后新增驱动）
+        'channel' => env('GOAT_PAYMENT_CHANNEL', 'sandbox'),
+
+        'sandbox' => [
+            // 回调验签密钥；生产环境必须换成强随机值，且与任何真实渠道密钥不同
+            'secret' => env('GOAT_PAYMENT_SANDBOX_SECRET', 'sandbox-not-for-production'),
+            // 异步通知时间戳容忍窗口（秒），防重放
+            'notify_tolerance' => (int) env('GOAT_PAYMENT_NOTIFY_TOLERANCE', 300),
+        ],
+
+        // 担保规则：支付成功即冻结，买家确认收货后才分账给卖家
+        'escrow' => [
+            'auto_settle_on_confirm' => (bool) env('GOAT_PAYMENT_AUTO_SETTLE', true),
+        ],
+
+    ],
+
     // 采集系统内部 API（契约 §4；HMAC 密钥只存服务器环境）
     'collector' => [
         'base_url' => env('COLLECTOR_BASE_URL', ''),

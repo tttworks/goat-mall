@@ -166,6 +166,31 @@ class OrderService
     }
 
     /**
+     * 支付成功（pending_payment → paid），担保资金置为冻结（T5 调用）。
+     *
+     * 幂等语义：重复回调直接返回当前订单，不再跃迁——
+     * 渠道会重推通知，靠状态机挡比靠调用方判重更可靠。
+     */
+    public function markPaid(int $orderId): Order
+    {
+        return DB::transaction(function () use ($orderId) {
+            /** @var Order $order */
+            $order = Order::query()->whereKey($orderId)->lockForUpdate()->firstOrFail();
+
+            if ($order->status !== OrderStatus::PendingPayment) {
+                return $order;
+            }
+
+            $order->transitTo(OrderStatus::Paid, [
+                'paid_at' => Carbon::now(),
+                'escrow_status' => 'frozen',
+            ]);
+
+            return $order->refresh();
+        }, 3);
+    }
+
+    /**
      * 卖家发货（paid → seller_shipped）。
      *
      * 只认订单里的 seller_id，不信任入参里的任何卖家标识；
