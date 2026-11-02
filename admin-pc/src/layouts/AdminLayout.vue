@@ -45,6 +45,10 @@
           <el-icon><Coin /></el-icon>
           <span>费率配置</span>
         </el-menu-item>
+        <el-menu-item index="/market-sources">
+          <el-icon><TrendCharts /></el-icon>
+          <span>行情源配置</span>
+        </el-menu-item>
         <el-menu-item index="/collector">
           <el-icon><Download /></el-icon>
           <span>采集触发</span>

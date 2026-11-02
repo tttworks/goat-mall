@@ -70,6 +70,12 @@ const routes = [
         meta: { title: '费率配置' }
       },
       {
+        path: 'market-sources',
+        name: 'market-sources',
+        component: () => import('../views/MarketSourceView.vue'),
+        meta: { title: '行情源配置' }
+      },
+      {
         path: 'collector',
         name: 'collector',
         component: () => import('../views/CollectorView.vue'),

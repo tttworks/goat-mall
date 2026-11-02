@@ -30,7 +30,7 @@
         <template #header>
           <div class="card-head">
             <span class="card-title">抓取行情</span>
-            <span class="cell-sub">三源：站内 / Mercari JP / eBay</span>
+            <span class="cell-sub">{{ sourceSummary }}</span>
           </div>
         </template>
 
@@ -40,12 +40,21 @@
           </el-form-item>
           <el-form-item label="来源">
             <el-checkbox-group v-model="priceForm.sources">
-              <el-checkbox value="site">站内</el-checkbox>
-              <el-checkbox value="mercari_jp">Mercari JP</el-checkbox>
-              <el-checkbox value="ebay">eBay</el-checkbox>
+              <el-checkbox
+                v-for="item in sourceOptions"
+                :key="item.collector_key"
+                :value="item.collector_key"
+              >
+                {{ item.label }}
+              </el-checkbox>
             </el-checkbox-group>
+            <div v-if="!sourceOptions.length" class="form-hint">
+              没有可用的采集源。去「行情源配置」启用后再回来，否则采集系统不知道该抓哪个平台。
+            </div>
           </el-form-item>
-          <el-button type="primary" :loading="priceLoading" @click="triggerPrice">触发抓取</el-button>
+          <el-button type="primary" :loading="priceLoading" :disabled="!sourceOptions.length" @click="triggerPrice">
+            触发抓取
+          </el-button>
         </el-form>
       </el-card>
 
@@ -87,12 +96,20 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { crawlFigure, crawlPrice, getJob } from '../api/collector'
+import { listMarketSources } from '../api/market'
 
-const priceForm = reactive({ figure_id: null, sources: ['site'] })
+const priceForm = reactive({ figure_id: null, sources: [] })
 const figureForm = reactive({ figure_id: null, external_text: '' })
+
+// 采集源不再写死在页面里：后台停用 eBay 之后，这里也不该再让人勾 eBay
+const sourceOptions = ref([])
+const sourceSummary = computed(() => {
+  if (!sourceOptions.value.length) return '暂无可用源'
+  return `已启用：${sourceOptions.value.map((item) => item.label).join(' / ')}`
+})
 
 const priceLoading = ref(false)
 const figureLoading = ref(false)
@@ -112,9 +129,29 @@ function handleError(e) {
   ElMessage.error(e.message)
 }
 
+/** 采集源 = 行情源配置里「已启用 + 有采集标识」的那些；拿不到配置不阻断页面，只清空勾选 */
+async function loadSources() {
+  try {
+    const payload = await listMarketSources()
+    sourceOptions.value = (payload?.data || []).filter((item) => item.enabled && item.collector_key)
+
+    const preferred =
+      sourceOptions.value.find((item) => item.collector_key === 'site') || sourceOptions.value[0]
+    priceForm.sources = preferred ? [preferred.collector_key] : []
+  } catch (e) {
+    sourceOptions.value = []
+    priceForm.sources = []
+  }
+}
+
 async function triggerPrice() {
   if (!priceForm.figure_id) {
     ElMessage.warning('请填写图鑑 ID')
+    return
+  }
+
+  if (!priceForm.sources.length) {
+    ElMessage.warning('请至少选择一个采集源')
     return
   }
   priceLoading.value = true
@@ -169,6 +206,8 @@ async function queryJob() {
     jobLoading.value = false
   }
 }
+
+onMounted(loadSources)
 </script>
 
 <style scoped lang="scss">
@@ -197,6 +236,13 @@ async function queryJob() {
 .job-query {
   display: flex;
   gap: 8px;
+}
+
+.form-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #8b8b90;
+  line-height: 1.5;
 }
 
 .result {
