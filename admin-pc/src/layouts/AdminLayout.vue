@@ -29,6 +29,10 @@
           <el-icon><ChatDotSquare /></el-icon>
           <span>帖子审核</span>
         </el-menu-item>
+        <el-menu-item index="/reports">
+          <el-icon><Warning /></el-icon>
+          <span>举报处理</span>
+        </el-menu-item>
         <el-menu-item index="/orders">
           <el-icon><List /></el-icon>
           <span>订单管理</span>

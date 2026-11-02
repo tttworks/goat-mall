@@ -36,6 +36,12 @@ export const POST_STATUS = {
   withdrawn: { label: '作者撤回', type: 'info' }
 }
 
+export const REPORT_STATUS = {
+  pending: { label: '待处理', type: 'warning' },
+  handled: { label: '已处理', type: 'success' },
+  dismissed: { label: '不成立', type: 'info' }
+}
+
 export const CONDITION_LABELS = {
   new: '全新',
   like_new: '几乎全新',

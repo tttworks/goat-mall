@@ -46,6 +46,12 @@ const routes = [
         meta: { title: '帖子审核' }
       },
       {
+        path: 'reports',
+        name: 'reports',
+        component: () => import('../views/ReportView.vue'),
+        meta: { title: '举报处理' }
+      },
+      {
         path: 'orders',
         name: 'orders',
         component: () => import('../views/OrderView.vue'),
