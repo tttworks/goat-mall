@@ -1,0 +1,215 @@
+/**
+ * GOAT 潮玩交易平台 / GOAT 潮玩数据采集
+ * Copyright © 火山文化科技（天津市火山文化科技有限责任公司）
+ * Author: Aloysius Luo
+ * 本文件为 GOAT 自有代码；第三方框架（Laravel / uni-app / 等）版权归各自权利人。
+ *
+ * 全局工具类：只放「跨页面复用」的原子样式。
+ * 页面私有布局写在各自 <style scoped>，避免这份文件膨胀成第二个 UI 框架。
+ */
+
+/* ---------- 布局 ---------- */
+.g-page {
+  min-height: 100vh;
+  padding: $goat-gap;
+  padding-bottom: 48rpx;
+}
+
+.g-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.g-row--between {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.g-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.g-gap {
+  gap: $goat-gap;
+}
+
+.g-flex-1 {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- 卡片 ---------- */
+.g-card {
+  background-color: $goat-surface;
+  border: 1rpx solid $goat-border;
+  border-radius: $goat-radius;
+  padding: $goat-gap;
+}
+
+.g-card--flat {
+  background-color: $goat-surface-2;
+  border: none;
+}
+
+/* ---------- 文本 ---------- */
+.g-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: $goat-text;
+}
+
+.g-muted {
+  color: $goat-text-muted;
+  font-size: 24rpx;
+}
+
+.g-dim {
+  color: $goat-text-dim;
+  font-size: 22rpx;
+}
+
+.g-ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.g-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- 价格 ---------- */
+.g-price {
+  font-family: 'DIN Alternate', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 700;
+  color: $goat-accent;
+}
+
+.g-price--lg {
+  font-size: 48rpx;
+}
+
+.g-price__symbol {
+  font-size: 24rpx;
+  margin-right: 2rpx;
+}
+
+/* ---------- 按钮 ---------- */
+.g-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  padding: 0 32rpx;
+  border-radius: 999rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  border: 1rpx solid $goat-border;
+  background-color: $goat-surface-2;
+  color: $goat-text;
+}
+
+.g-btn--primary {
+  background-color: $goat-accent;
+  color: $goat-accent-ink;
+  border-color: $goat-accent;
+}
+
+.g-btn--ghost {
+  background-color: transparent;
+  color: $goat-text-muted;
+}
+
+.g-btn--danger {
+  background-color: transparent;
+  color: $goat-danger;
+  border-color: rgba(255, 90, 90, 0.4);
+}
+
+.g-btn--sm {
+  height: 60rpx;
+  padding: 0 24rpx;
+  font-size: 24rpx;
+}
+
+.g-btn--disabled {
+  opacity: 0.45;
+}
+
+/* ---------- 标签 / 徽标 ---------- */
+.g-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 56rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid $goat-border;
+  background-color: $goat-surface;
+  color: $goat-text-muted;
+  font-size: 24rpx;
+}
+
+.g-chip--active {
+  background-color: $goat-accent;
+  border-color: $goat-accent;
+  color: $goat-accent-ink;
+  font-weight: 600;
+}
+
+.g-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 40rpx;
+  padding: 0 12rpx;
+  border-radius: $goat-radius-sm;
+  background-color: rgba(255, 255, 255, 0.06);
+  color: $goat-text-muted;
+  font-size: 20rpx;
+}
+
+.g-tag--accent {
+  background-color: rgba(216, 255, 62, 0.14);
+  color: $goat-accent;
+}
+
+.g-tag--danger {
+  background-color: rgba(255, 90, 90, 0.14);
+  color: $goat-danger;
+}
+
+/* ---------- 空态 / 加载 ---------- */
+.g-empty {
+  padding: 120rpx 0;
+  text-align: center;
+  color: $goat-text-dim;
+  font-size: 26rpx;
+}
+
+.g-loading {
+  padding: 32rpx 0;
+  text-align: center;
+  color: $goat-text-dim;
+  font-size: 24rpx;
+}
+
+/* ---------- 输入 ---------- */
+.g-input {
+  height: 96rpx;
+  padding: 0 28rpx;
+  border-radius: $goat-radius;
+  background-color: $goat-surface-2;
+  border: 1rpx solid $goat-border;
+  color: $goat-text;
+  font-size: 30rpx;
+}
+
+.g-placeholder {
+  color: $goat-text-dim;
+}

@@ -10,10 +10,10 @@
 | 目录 | 内容 | 技术栈 |
 |---|---|---|
 | `backend/` | 后端 API + WebSocket + 队列 | PHP 8.3 + Laravel 12 (Octane/Reverb/Horizon) |
-| `worker-pricing/` | 行情采集与圖鑑爬虫 Worker | Python 3.12 + FastAPI + Playwright |
+| `worker-pricing/` | 采集侧目录说明（实现代码在独立仓 `goat-collector`） | — |
 | `app-mobile/` | C 端三端（买家 + 卖家手机后台分包） | uni-app (Vue3 + Vite) |
-| `admin-pc/` | 平台管理后台（PC） | Vue3 + Element Plus + Vite |
-| `docs/` | 项目约定 / 进度日历 / 踩坑记录 | — |
+| `admin-pc/` | 平台管理后台（PC）：图鑑 / 卖家 / 商品 / 帖子审核 + 采集触发 | Vue3 + Element Plus + Vite |
+| `docs/` | 项目约定 / 架构契约 / 架构说明 / 进度日历 / 开发日志 / 踩坑记录 / 软著材料清单 | — |
 
 ## 基础设施（v1.4 定案）
 
@@ -21,7 +21,32 @@
 - 缓存/队列/实时底座：**Redis 7**（PgBouncer 配套连接池）
 - 搜索：Meilisearch
 - 对象存储：UCloud UFile（S3 协议起步）→ 正式期迁腾讯 COS / 阿里 OSS（DB 只存 key）
-- 临时站：#19 东京 216.23.87.130
+- 临时站：东京 BitsFlow 216.23.112.40（`goat.websitedemos.cn`）
+
+## 本地跑起来
+
+```powershell
+# 后端 API（http://127.0.0.1:8000）
+cd backend
+composer install
+Copy-Item .env.example .env
+php artisan key:generate
+php artisan migrate --seed          # 首次会建运营管理员：口令取 GOAT_ADMIN_PASSWORD，留空则随机生成并打印一次
+php artisan serve
+
+# 运营后台（http://127.0.0.1:5174，/api 代理到 8000）
+cd admin-pc
+npm install
+npm run dev
+
+# C 端 H5（uni-app 自带 dev server）
+cd app-mobile
+npm install
+npm run dev:h5
+```
+
+- 实时推送默认关闭（`GOAT_WS_ENABLED=false`）：前端检测未配置即退回 HTTP 拉取，不影响任何功能；接 Reverb 后改成 `true` 并填 `REVERB_*`。
+- 采集触发需要 `COLLECTOR_BASE_URL` / `COLLECTOR_HMAC_KEY`，未配置时后台返回 503 并提示"采集服务未配置"，属预期行为。
 
 ## 开发守则
 
