@@ -93,7 +93,8 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  // 与 vite base 同源：独立域名部署是 '/'，站点子路径部署（/admin/）自动跟随
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 

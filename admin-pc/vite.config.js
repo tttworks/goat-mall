@@ -9,8 +9,14 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
+/**
+ * base 走环境变量：本地开发与独立域名部署仍是 '/'，
+ * 挂到站点子路径（临时站 /admin/）时用 `VITE_APP_BASE=/admin/ npm run build`，
+ * 与 router 的 createWebHistory(import.meta.env.BASE_URL) 自动对齐。
+ */
 export default defineConfig({
   plugins: [vue()],
+  base: process.env.VITE_APP_BASE || '/',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
