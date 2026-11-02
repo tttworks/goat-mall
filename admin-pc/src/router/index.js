@@ -46,6 +46,30 @@ const routes = [
         meta: { title: '帖子审核' }
       },
       {
+        path: 'orders',
+        name: 'orders',
+        component: () => import('../views/OrderView.vue'),
+        meta: { title: '订单管理' }
+      },
+      {
+        path: 'refunds',
+        name: 'refunds',
+        component: () => import('../views/RefundView.vue'),
+        meta: { title: '退款审核' }
+      },
+      {
+        path: 'auctions',
+        name: 'auctions',
+        component: () => import('../views/AuctionView.vue'),
+        meta: { title: '竞价管理' }
+      },
+      {
+        path: 'fees',
+        name: 'fees',
+        component: () => import('../views/FeeRuleView.vue'),
+        meta: { title: '费率配置' }
+      },
+      {
         path: 'collector',
         name: 'collector',
         component: () => import('../views/CollectorView.vue'),

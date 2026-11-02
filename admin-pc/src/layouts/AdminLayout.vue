@@ -29,6 +29,22 @@
           <el-icon><ChatDotSquare /></el-icon>
           <span>帖子审核</span>
         </el-menu-item>
+        <el-menu-item index="/orders">
+          <el-icon><List /></el-icon>
+          <span>订单管理</span>
+        </el-menu-item>
+        <el-menu-item index="/refunds">
+          <el-icon><Wallet /></el-icon>
+          <span>退款审核</span>
+        </el-menu-item>
+        <el-menu-item index="/auctions">
+          <el-icon><Timer /></el-icon>
+          <span>竞价管理</span>
+        </el-menu-item>
+        <el-menu-item index="/fees">
+          <el-icon><Coin /></el-icon>
+          <span>费率配置</span>
+        </el-menu-item>
         <el-menu-item index="/collector">
           <el-icon><Download /></el-icon>
           <span>采集触发</span>
