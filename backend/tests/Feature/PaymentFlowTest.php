@@ -9,6 +9,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Address;
 use App\Models\FeeRule;
 use App\Models\Listing;
 use App\Models\Order;
@@ -89,8 +90,25 @@ class PaymentFlowTest extends TestCase
     {
         Sanctum::actingAs($buyer);
 
+        // 下单必须带收货地址：同一买家复用一条
+        $address = Address::query()->firstOrCreate(
+            ['user_id' => $buyer->user_id],
+            [
+                'receiver_name' => '测试收货人',
+                'receiver_phone' => '13800138000',
+                'province' => '天津市',
+                'city' => '天津市',
+                'district' => '和平区',
+                'detail' => '南京路 1 号 101',
+                'is_default' => true,
+            ]
+        );
+
         return (int) $this->withHeader('Idempotency-Key', $key)
-            ->postJson('/api/v1/orders', ['listing_id' => $listing->listing_id])
+            ->postJson('/api/v1/orders', [
+                'listing_id' => $listing->listing_id,
+                'address_id' => $address->address_id,
+            ])
             ->assertCreated()
             ->json('data.order_id');
     }

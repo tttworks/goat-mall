@@ -9,6 +9,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Address;
 use App\Models\Auction;
 use App\Models\FeeRule;
 use App\Models\Figure;
@@ -85,13 +86,33 @@ class TradeClosureTest extends TestCase
         ]);
     }
 
+    /** 下单必须带收货地址：同一买家复用一条，避免各用例重复样板 */
+    private function addressFor(User $buyer): Address
+    {
+        return Address::query()->firstOrCreate(
+            ['user_id' => $buyer->user_id],
+            [
+                'receiver_name' => '测试收货人',
+                'receiver_phone' => '13800138000',
+                'province' => '天津市',
+                'city' => '天津市',
+                'district' => '和平区',
+                'detail' => '南京路 1 号 101',
+                'is_default' => true,
+            ]
+        );
+    }
+
     /** 走完「下单 → 发起支付 → 渠道回调成功」，返回 order_id */
     private function paidOrder(User $buyer, Listing $listing, string $suffix): int
     {
         Sanctum::actingAs($buyer);
 
         $created = $this->withHeader('Idempotency-Key', 'order-'.$suffix)
-            ->postJson('/api/v1/orders', ['listing_id' => $listing->listing_id])
+            ->postJson('/api/v1/orders', [
+                'listing_id' => $listing->listing_id,
+                'address_id' => $this->addressFor($buyer)->address_id,
+            ])
             ->assertCreated();
 
         $orderId = (int) $created->json('data.order_id');

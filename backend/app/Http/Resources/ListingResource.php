@@ -27,6 +27,8 @@ final class ListingResource
             'listing_id' => $listing->listing_id,
             'title' => $listing->title,
             'price' => (string) $listing->price,
+            // 买家要在详情页看到「另需运费 N 元」还是「包邮」，列表页也一并给
+            'shipping_fee' => (string) ($listing->shipping_fee ?? '0.00'),
             'currency' => $listing->currency,
             'condition' => $listing->condition_enum,
             'status' => $listing->status->value,

@@ -34,6 +34,8 @@ class ListingUpdateRequest extends FormRequest
             'figure_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'condition' => ['sometimes', Rule::in(['new', 'like_new', 'used_good', 'used_fair', 'defective', 'for_parts'])],
             'price' => ['sometimes', 'string', 'regex:/^\d{1,8}(\.\d{1,2})?$/'],
+            // 已上架商品也允许改运费：只影响改动之后的新订单
+            'shipping_fee' => ['sometimes', 'string', 'regex:/^\d{1,8}(\.\d{1,2})?$/'],
             // 已上架商品允许改库存（含设为 0 表示暂不接单）
             'stock' => ['sometimes', 'integer', 'min:0', 'max:999'],
             'cover_key' => ['sometimes', 'nullable', 'string', 'max:255'],

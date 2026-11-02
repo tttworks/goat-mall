@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\PostController as AdminPostController;
 use App\Http\Controllers\Api\Admin\RefundController as AdminRefundController;
+use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuctionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BroadcastAuthController;
@@ -156,6 +157,16 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->whereNumber('order')->name('orders.ship');
         Route::post('/orders/{order}/confirm', [OrderController::class, 'confirm'])
             ->whereNumber('order')->name('orders.confirm');
+
+        // 收货地址簿：下单必须带 address_id，卖家照订单快照发货
+        Route::get('/me/addresses', [AddressController::class, 'index'])->name('addresses.index');
+        Route::post('/me/addresses', [AddressController::class, 'store'])->name('addresses.store');
+        Route::put('/me/addresses/{address}', [AddressController::class, 'update'])
+            ->whereNumber('address')->name('addresses.update');
+        Route::delete('/me/addresses/{address}', [AddressController::class, 'destroy'])
+            ->whereNumber('address')->name('addresses.destroy');
+        Route::post('/me/addresses/{address}/default', [AddressController::class, 'setDefault'])
+            ->whereNumber('address')->name('addresses.default');
 
         // 支付（T5）：发起后拿到通道拉起参数
         Route::post('/orders/{order}/payments', [PaymentController::class, 'store'])

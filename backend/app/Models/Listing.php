@@ -36,6 +36,7 @@ class Listing extends Model
         return [
             'status' => ListingStatus::class,
             'price' => 'decimal:2',
+            'shipping_fee' => 'decimal:2',
             'stock' => 'integer',
             'gallery_keys' => 'array',
             'meta' => 'array',

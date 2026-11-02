@@ -53,6 +53,8 @@ class ListingService
             'description' => $data['description'] ?? null,
             'condition_enum' => (string) ($data['condition'] ?? 'used_good'),
             'price' => Money::fromCents($price),
+            // 运费是挂牌条件的一部分：0 表示包邮，买家下单时按此值计入应付
+            'shipping_fee' => Money::fromCents($this->normalizeShippingFee($data['shipping_fee'] ?? null)),
             'stock' => max(1, (int) ($data['stock'] ?? 1)),
             'cover_key' => $this->toMediaKey($data['cover_url'] ?? $data['cover_key'] ?? null),
             'gallery_keys' => $this->toMediaKeys((array) ($data['gallery_urls'] ?? $data['gallery_keys'] ?? [])),
@@ -79,9 +81,10 @@ class ListingService
         $payload = [];
 
         // 已上架商品：只允许影响「卖什么价、还有几件」的字段，标题/图鑑/品相改动需先下架
+        // 运费与价格同属交易条件，在售也能改（只影响改动之后的新订单）
         $allowed = $isActive
-            ? ['price', 'stock', 'description']
-            : ['title', 'description', 'condition_enum', 'price', 'stock', 'figure_id'];
+            ? ['price', 'shipping_fee', 'stock', 'description']
+            : ['title', 'description', 'condition_enum', 'price', 'shipping_fee', 'stock', 'figure_id'];
 
         if (array_key_exists('title', $data) && in_array('title', $allowed, true)) {
             $payload['title'] = trim((string) $data['title']);
@@ -97,6 +100,10 @@ class ListingService
 
         if (array_key_exists('price', $data)) {
             $payload['price'] = Money::fromCents($this->normalizeAmount($data['price'], '售价'));
+        }
+
+        if (array_key_exists('shipping_fee', $data) && in_array('shipping_fee', $allowed, true)) {
+            $payload['shipping_fee'] = Money::fromCents($this->normalizeShippingFee($data['shipping_fee']));
         }
 
         if (array_key_exists('stock', $data)) {
@@ -254,6 +261,26 @@ class ListingService
 
         if ($cents <= 0) {
             throw new TradeException("{$label}必须大于 0");
+        }
+
+        return $cents;
+    }
+
+    /** 运费可以为 0（包邮），因此不能复用「必须大于 0」的售价校验 */
+    private function normalizeShippingFee(mixed $fee): int
+    {
+        if ($fee === null || $fee === '') {
+            return 0;
+        }
+
+        try {
+            $cents = Money::toCents($fee);
+        } catch (\Throwable) {
+            throw new TradeException('运费格式非法（最多两位小数）');
+        }
+
+        if ($cents < 0) {
+            throw new TradeException('运费不能为负数');
         }
 
         return $cents;

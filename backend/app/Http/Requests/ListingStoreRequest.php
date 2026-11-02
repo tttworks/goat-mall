@@ -35,6 +35,8 @@ class ListingStoreRequest extends FormRequest
             'condition' => ['nullable', Rule::in(['new', 'like_new', 'used_good', 'used_fair', 'defective', 'for_parts'])],
             // 金额用字符串传，避免 JS 浮点污染：10.10 存成 10.099999 的经典坑
             'price' => ['required', 'string', 'regex:/^\d{1,8}(\.\d{1,2})?$/'],
+            // 运费：不填即包邮；下单时按此值计入应付，客户端无权改
+            'shipping_fee' => ['nullable', 'string', 'regex:/^\d{1,8}(\.\d{1,2})?$/'],
             'stock' => ['nullable', 'integer', 'min:1', 'max:999'],
             'cover_key' => ['nullable', 'string', 'max:255'],
             'cover_url' => ['nullable', 'string', 'max:500'],
@@ -52,6 +54,7 @@ class ListingStoreRequest extends FormRequest
     {
         return [
             'price.regex' => '价格格式非法（整数部分最多 8 位，最多两位小数）',
+            'shipping_fee.regex' => '运费格式非法（整数部分最多 8 位，最多两位小数）',
             'condition.in' => '品相取值不合法',
         ];
     }

@@ -12,6 +12,7 @@ namespace App\Services\Trade;
 use App\Enums\ListingStatus;
 use App\Enums\OrderStatus;
 use App\Exceptions\TradeException;
+use App\Models\Address;
 use App\Models\Listing;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -33,7 +34,12 @@ class OrderService
     public function __construct(private readonly FeeCalculator $fees) {}
 
     /**
-     * @param  array{quantity?: int, shipping_amount?: string, remark?: string}  $options
+     * 两条定价纪律，都由服务端说了算：
+     *   1. 运费取 listings.shipping_fee，**不认客户端传的任何运费**——此前 shipping_amount
+     *      由买家自行传入，等于买家可以把自己的运费改成 0；
+     *   2. 收货地址必须属于下单人，并在下单瞬间整条快照进订单（地址之后可改可删）。
+     *
+     * @param  array{quantity?: int, remark?: string, address?: Address|null}  $options
      * @return array{order: Order, replayed: bool, quote: FeeQuote}
      */
     public function checkout(int $buyerId, int $listingId, string $idempotencyKey, array $options = []): array
@@ -47,11 +53,16 @@ class OrderService
             return ['order' => $replayed, 'replayed' => true, 'quote' => $this->quoteOf($replayed)];
         }
 
+        // 实物交易没有地址就无法发货：在进事务前挡掉，避免白锁库存
+        $address = $options['address'] ?? null;
+        if (! $address instanceof Address) {
+            throw new TradeException('请先填写收货地址');
+        }
+
         $quantity = max((int) ($options['quantity'] ?? 1), 1);
-        $shipping = Money::toCents((string) ($options['shipping_amount'] ?? '0'));
 
         try {
-            [$order, $quote] = DB::transaction(function () use ($buyerId, $listingId, $idempotencyKey, $quantity, $shipping, $options) {
+            [$order, $quote] = DB::transaction(function () use ($buyerId, $listingId, $idempotencyKey, $quantity, $address, $options) {
                 /** @var Listing $listing */
                 $listing = Listing::query()->whereKey($listingId)->lockForUpdate()->firstOrFail();
 
@@ -73,6 +84,9 @@ class OrderService
                     $this->fees->resolve((int) $listing->seller_id, (string) ($listing->meta['category'] ?? ''))
                 );
 
+                // 每单计一次运费（C2C 一物一价，多件合并寄送的运费差异由卖家自行让利）
+                $shipping = Money::toCents((string) ($listing->shipping_fee ?? '0'));
+
                 $order = Order::create([
                     'order_no' => $this->generateOrderNo($buyerId),
                     'idempotency_key' => $idempotencyKey,
@@ -89,6 +103,14 @@ class OrderService
                     'fee_bearer' => $quote->bearer->value,
                     'fee_snapshot' => $quote->snapshot(),
                     'remark' => $options['remark'] ?? null,
+                    // 收货快照：卖家发货只认订单里的这组字段，地址簿后续怎么改都不影响历史单
+                    'address_id' => $address->address_id,
+                    'receiver_name' => $address->receiver_name,
+                    'receiver_phone' => $address->receiver_phone,
+                    'receiver_province' => $address->province,
+                    'receiver_city' => $address->city,
+                    'receiver_district' => $address->district,
+                    'receiver_detail' => $address->detail,
                     'expire_at' => Carbon::now()->addMinutes((int) config('goat.trade.payment_timeout_minutes', 30)),
                 ]);
 
