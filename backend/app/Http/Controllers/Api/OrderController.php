@@ -10,6 +10,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Order;
+use App\Services\Notify\NotificationService;
 use App\Services\Payment\PaymentService;
 use App\Services\Trade\OrderService;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +28,7 @@ class OrderController extends Controller
     public function __construct(
         private readonly OrderService $orders,
         private readonly PaymentService $payments,
+        private readonly NotificationService $notifications,
     ) {}
 
     public function store(Request $request): JsonResponse
@@ -131,6 +133,15 @@ class OrderController extends Controller
             $validated['tracking_no']
         );
 
+        $this->notifications->push(
+            (int) $order->buyer_id,
+            'order.shipped',
+            '卖家已发货',
+            sprintf('%s %s，收到货后请确认收货', $order->shipping_company, $order->tracking_no),
+            ['order_id' => (int) $order->order_id, 'tracking_no' => $order->tracking_no],
+            'order:'.$order->order_id.':shipped'
+        );
+
         return response()->json(['data' => $this->payload($order, true)]);
     }
 
@@ -143,6 +154,15 @@ class OrderController extends Controller
         if ((bool) config('goat.payment.escrow.auto_settle_on_confirm', true)) {
             $this->payments->settleByOrder((int) $order->order_id);
         }
+
+        $this->notifications->push(
+            (int) $order->seller_id,
+            'order.completed',
+            '买家已确认收货',
+            sprintf('订单 %s 已完成，货款已结算', $order->order_no),
+            ['order_id' => (int) $order->order_id],
+            'order:'.$order->order_id.':completed'
+        );
 
         return response()->json(['data' => $this->payload($order, true)]);
     }

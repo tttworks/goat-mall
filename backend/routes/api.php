@@ -16,11 +16,15 @@ use App\Http\Controllers\Api\Admin\ListingController as AdminListingController;
 use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Api\AuctionController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\FigureController;
+use App\Http\Controllers\Api\FollowController;
 use App\Http\Controllers\Api\IdentityController;
 use App\Http\Controllers\Api\ListingController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\SellerAuctionController;
 use App\Http\Controllers\Api\SellerController;
 use App\Http\Controllers\Api\SellerListingController;
@@ -159,4 +163,35 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/listings/{listing}/review', [AdminListingController::class, 'review'])
             ->whereNumber('listing')->name('listings.review');
     });
+
+    // ---------------- 社群互动（T6）----------------
+    // 收藏 / 关注 / 评价 / 通知：user_id 一律取自 Token，路由参数只表示「操作对象」
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/me/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+        Route::post('/me/favorites', [FavoriteController::class, 'store'])->name('favorites.store');
+        Route::delete('/me/favorites/{targetType}/{targetId}', [FavoriteController::class, 'destroy'])
+            ->where('targetType', 'listing|figure')->whereNumber('targetId')->name('favorites.destroy');
+
+        Route::get('/me/follows', [FollowController::class, 'index'])->name('follows.index');
+        Route::post('/sellers/{seller}/follow', [FollowController::class, 'store'])
+            ->whereNumber('seller')->name('follows.store');
+        Route::delete('/sellers/{seller}/follow', [FollowController::class, 'destroy'])
+            ->whereNumber('seller')->name('follows.destroy');
+
+        // 评价：买家评订单，卖家回评价（角色由服务层按 buyer_id / seller_id 判定）
+        Route::post('/orders/{order}/reviews', [ReviewController::class, 'store'])
+            ->whereNumber('order')->name('reviews.store');
+        Route::post('/reviews/{review}/reply', [ReviewController::class, 'reply'])
+            ->whereNumber('review')->name('reviews.reply');
+
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])
+            ->name('notifications.read_all');
+        Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])
+            ->whereNumber('notification')->name('notifications.read');
+    });
+
+    // 店铺评价墙（公开）：未登录可看，登录后附带「是否已关注」
+    Route::get('/sellers/{seller}/reviews', [ReviewController::class, 'sellerIndex'])
+        ->whereNumber('seller')->name('sellers.reviews');
 });

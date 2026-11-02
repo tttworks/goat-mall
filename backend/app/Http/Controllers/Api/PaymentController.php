@@ -12,6 +12,7 @@ namespace App\Http\Controllers\Api;
 use App\Exceptions\TradeException;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Services\Notify\NotificationService;
 use App\Services\Payment\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,10 @@ use Illuminate\Routing\Controller;
  */
 class PaymentController extends Controller
 {
-    public function __construct(private readonly PaymentService $payments) {}
+    public function __construct(
+        private readonly PaymentService $payments,
+        private readonly NotificationService $notifications,
+    ) {}
 
     /** 发起支付：同一 idempotency_key 重复调用返回同一支付单，不重复下单 */
     public function store(Request $request, int $orderId): JsonResponse
@@ -64,7 +68,40 @@ class PaymentController extends Controller
             return response()->json(['code' => 'INVALID_SIGNATURE'], 400);
         }
 
+        // 通知只对「真的付成功」的支付单发；渠道重推时靠 dedupe_key 命中同一条，不会重复打扰
+        if (! in_array($payment->status->value, ['pending', 'failed'], true)) {
+            $this->notifyPaid($payment);
+        }
+
         return response()->json(['code' => 'SUCCESS', 'data' => $this->payload($payment)]);
+    }
+
+    /** 支付成功双通知：买家确认已付，卖家去发货（两边的下一步动作不同，不能合成一条） */
+    private function notifyPaid(Payment $payment): void
+    {
+        $order = Order::query()->whereKey($payment->order_id)->first();
+
+        if ($order === null) {
+            return;
+        }
+
+        $this->notifications->push(
+            (int) $order->buyer_id,
+            'order.paid',
+            '支付成功',
+            sprintf('订单 %s 已付款，资金由平台担保，确认收货后结算给卖家', $order->order_no),
+            ['order_id' => (int) $order->order_id, 'payment_id' => (int) $payment->payment_id],
+            'order:'.$order->order_id.':paid'
+        );
+
+        $this->notifications->push(
+            (int) $order->seller_id,
+            'order.pending_ship',
+            '买家已付款，请尽快发货',
+            sprintf('订单 %s 待发货', $order->order_no),
+            ['order_id' => (int) $order->order_id],
+            'order:'.$order->order_id.':pending_ship'
+        );
     }
 
     /** 查询支付单（仅订单买家或卖家可见） */

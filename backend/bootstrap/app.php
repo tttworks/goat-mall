@@ -77,5 +77,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return response()->json(['message' => $e->getMessage(), 'code' => $e->errorCode], $e->statusCode);
         });
+
+        // 社群/互动域（T6）：403 越权、404 不可见、409 重复、422 入参非法
+        $exceptions->render(function (\App\Exceptions\SocialException $e, Request $request) {
+            if ($e->statusCode >= 500) {
+                report($e);
+            }
+
+            return response()->json(['message' => $e->getMessage(), 'code' => $e->errorCode], $e->statusCode);
+        });
     })
     ->create();
