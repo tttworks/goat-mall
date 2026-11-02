@@ -1,0 +1,7 @@
+# 生成物不入库：源程序抽取结果、排版中间件、提交用 PDF 都可由脚本一键重建。
+# 重建：python docs/copyright/build_source_pdf.py && python docs/copyright/verify_source_pdf.py
+source-all.txt
+source-head-30p.txt
+source-tail-30p.txt
+source-60p.html
+*.pdf
