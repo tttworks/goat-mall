@@ -56,7 +56,7 @@ import { requireLogin } from '../../store/session'
 import { back, toast } from '../../utils/ui'
 
 /**
- * 举报页（商品 / 帖子 / 用户共用）。
+ * 举报页（商品 / 帖子 / 评论 / 用户共用）。
  *
  * 入口只传 target_type + target_id（标题仅用于展示），不信任 URL 里的标题做任何判断；
  * 目标是否存在、是否可见、是不是自己的，全部由服务端判定。
@@ -80,11 +80,11 @@ const submitting = ref(false)
 const reasons = REASONS
 
 const targetLabel = computed(() => {
-  return { listing: '举报商品', post: '举报帖子', user: '举报用户' }[targetType.value] || '举报'
+  return { listing: '举报商品', post: '举报帖子', comment: '举报评论', user: '举报用户' }[targetType.value] || '举报'
 })
 
 onLoad((query = {}) => {
-  targetType.value = ['listing', 'post', 'user'].includes(query.target_type) ? query.target_type : 'post'
+  targetType.value = ['listing', 'post', 'comment', 'user'].includes(query.target_type) ? query.target_type : 'post'
   targetId.value = Number(query.target_id || 0)
   title.value = query.title ? decodeURIComponent(query.title) : ''
 

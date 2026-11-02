@@ -59,15 +59,24 @@ async function load() {
   }
 }
 
+/**
+ * 点通知：先标记已读，再按 payload 里的 post_id 跳到帖子详情。
+ * 已读的通知也要能点进去——否则「看过的互动」就再也找不到了。
+ */
 async function markRead(item) {
-  if (item.read_at) return
+  if (!item.read_at) {
+    try {
+      await readNotification(item.notification_id)
+      item.read_at = new Date().toISOString()
+      unread.value = Math.max(0, unread.value - 1)
+    } catch (e) {
+      // 请求层已提示，不影响后续跳转
+    }
+  }
 
-  try {
-    await readNotification(item.notification_id)
-    item.read_at = new Date().toISOString()
-    unread.value = Math.max(0, unread.value - 1)
-  } catch (e) {
-    // 请求层已提示
+  const targetPostId = Number(item.payload?.post_id || 0)
+  if (targetPostId) {
+    uni.navigateTo({ url: `/pages/community/post?id=${targetPostId}` })
   }
 }
 

@@ -52,7 +52,7 @@
     <view class="g-card comments">
       <text class="comments__title">评论 {{ post?.comments_count || 0 }}</text>
 
-      <view v-for="item in comments" :key="item.comment_id" class="comment">
+      <view v-for="item in comments" :key="item.comment_id" class="comment" @longpress="onCommentLongPress(item)">
         <view class="comment__head">
           <text class="comment__name">{{ item.author?.nickname || item.author?.username || '匿名玩家' }}</text>
           <text class="g-dim">{{ relativeTime(item.created_at) }}</text>
@@ -253,6 +253,33 @@ function report() {
   const title = (post.value?.content || '纯图片帖').slice(0, 20)
   uni.navigateTo({
     url: `/pages/report/index?target_type=post&target_id=${postId.value}&title=${encodeURIComponent(title)}`
+  })
+}
+
+/**
+ * 评论操作走长按而不是每行塞两个按钮：
+ * 评论行本来就窄，常驻「举报/删除」会把内容挤成两行，长按是社区类产品的通行手势。
+ */
+function onCommentLongPress(comment) {
+  if (!requireLogin()) return
+
+  const actions = isMine(comment) ? ['删除这条评论', '取消'] : ['举报这条评论', '取消']
+
+  uni.showActionSheet({
+    itemList: actions,
+    success: ({ tapIndex }) => {
+      if (tapIndex !== 0) return
+
+      if (isMine(comment)) {
+        removeComment(comment)
+        return
+      }
+
+      const title = String(comment.content || '').slice(0, 20)
+      uni.navigateTo({
+        url: `/pages/report/index?target_type=comment&target_id=${comment.comment_id}&title=${encodeURIComponent(title)}`
+      })
+    }
   })
 }
 
