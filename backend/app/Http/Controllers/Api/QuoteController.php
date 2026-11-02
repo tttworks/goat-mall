@@ -10,6 +10,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Figure;
+use App\Services\Market\MarketSourceService;
 use App\Services\Market\QuoteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,7 +25,10 @@ use Illuminate\Routing\Controller;
  */
 class QuoteController extends Controller
 {
-    public function __construct(private readonly QuoteService $quotes) {}
+    public function __construct(
+        private readonly QuoteService $quotes,
+        private readonly MarketSourceService $sources,
+    ) {}
 
     public function summary(Request $request, int $figureId): JsonResponse
     {
@@ -43,7 +47,8 @@ class QuoteController extends Controller
     {
         $validated = $request->validate([
             'days' => ['nullable', 'integer', 'between:1,365'],
-            'source' => ['nullable', 'string', 'in:'.implode(',', array_keys(QuoteService::SOURCES)).',all'],
+            // 白名单含「已停用但登记过」的源：停用只是不再展示，回看历史不该 422
+            'source' => ['nullable', 'string', 'in:'.implode(',', array_keys($this->sources->labels(false))).',all'],
         ]);
 
         Figure::query()->published()->whereKey($figureId)->firstOrFail();

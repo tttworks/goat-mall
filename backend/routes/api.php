@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\Admin\CollectorController as AdminCollectorControll
 use App\Http\Controllers\Api\Admin\FeeRuleController as AdminFeeRuleController;
 use App\Http\Controllers\Api\Admin\FigureController as AdminFigureController;
 use App\Http\Controllers\Api\Admin\ListingController as AdminListingController;
+use App\Http\Controllers\Api\Admin\MarketSourceController;
 use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\PostController as AdminPostController;
@@ -310,5 +311,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->whereNumber('auction')->name('auctions.show');
         Route::post('/auctions/{auction}/cancel', [AdminAuctionController::class, 'cancel'])
             ->whereNumber('auction')->name('auctions.cancel');
+
+        // 行情源配置（T9）：只配「源」，价格点仍由采集侧与成交回写写入
+        Route::get('/market-sources', [MarketSourceController::class, 'index'])
+            ->name('market_sources.index');
+        Route::patch('/market-sources/{marketSource}', [MarketSourceController::class, 'update'])
+            ->whereNumber('marketSource')->name('market_sources.update');
     });
 });

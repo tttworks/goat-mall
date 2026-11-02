@@ -29,7 +29,12 @@ use Illuminate\Support\Facades\Log;
  */
 class QuoteService
 {
-    /** 前端可选的行情源；labels 与 C 端 chips 一一对应 */
+    /**
+     * 出厂行情源（与 C 端 chips 一一对应）。
+     *
+     * 运行时以 `market_sources` 表为准（后台可改名、可停用）；常量只在
+     * 「表尚未迁移 / 表为空」时兜底，避免行情页因为没配置就没有源可选。
+     */
     public const SOURCES = [
         'internal' => '站内成交',
         'ebay' => 'eBay',
@@ -39,6 +44,8 @@ class QuoteService
 
     /** 单次聚合最多取多少点：行情页做趋势不需要全量，防大图鑑把内存打满 */
     private const MAX_POINTS = 2000;
+
+    public function __construct(private readonly MarketSourceService $sources) {}
 
     /**
      * 多源概览：各源最新价 + 站内成交统计（详情页顶部价签与「近 30 天成交 N 笔」）。
@@ -51,7 +58,8 @@ class QuoteService
         $points = $this->recent($figureId, $since);
 
         $bySources = [];
-        foreach (self::SOURCES as $source => $label) {
+        // 遍历配置里已启用的源：停用后该源不再出现在多源对比里，但历史点仍在库中
+        foreach ($this->sources->labels() as $source => $label) {
             $rows = $points->where('source', $source)->values();
             $latest = $rows->first();
 
@@ -201,15 +209,24 @@ class QuoteService
             ->get();
     }
 
-    /** @return array<int, string> */
+    /**
+     * C 端 chips 的可选源：既要库里有数据，也要后台仍启用。
+     *
+     * 只按库过滤会出现「后台已停用 eBay，前端还在给 eBay 标签点了没数据」的死入口。
+     *
+     * @return array<int, string>
+     */
     private function availableSources(int $figureId, Carbon $since): array
     {
+        $enabled = array_keys($this->sources->labels());
+
         return PricePoint::query()
             ->where('figure_id', $figureId)
             ->where('sold_at', '>=', $since)
             ->distinct()
             ->pluck('source')
             ->map(static fn ($source) => (string) $source)
+            ->filter(static fn (string $source) => in_array($source, $enabled, true))
             ->values()
             ->all();
     }
