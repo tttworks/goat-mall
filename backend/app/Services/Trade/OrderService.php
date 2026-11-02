@@ -11,6 +11,7 @@ namespace App\Services\Trade;
 
 use App\Enums\ListingStatus;
 use App\Enums\OrderStatus;
+use App\Enums\RefundStatus;
 use App\Exceptions\TradeException;
 use App\Models\Address;
 use App\Models\Listing;
@@ -267,6 +268,69 @@ class OrderService
 
             return $order->refresh();
         }, 3);
+    }
+
+    /**
+     * 系统代买家确认收货（调度用）。
+     *
+     * 与手动确认走**同一条状态机路径**，只有操作者不同：买家可以一直不点确认，
+     * 但担保款不能因此永久冻结在平台。返回 null 表示订单已不在可确认状态
+     * （并发下已被买家确认、或已进入退款），调用方跳过即可。
+     */
+    public function confirmReceiptByTimeout(Order $order): ?Order
+    {
+        return DB::transaction(function () use ($order) {
+            /** @var Order|null $locked */
+            $locked = Order::query()->whereKey($order->order_id)->lockForUpdate()->first();
+
+            if ($locked === null || $locked->status !== OrderStatus::SellerShipped) {
+                return null;
+            }
+
+            $locked->transitTo(OrderStatus::BuyerConfirmed, ['confirmed_at' => Carbon::now()]);
+            $locked->transitTo(OrderStatus::Completed, ['escrow_status' => 'released']);
+
+            return $locked->refresh();
+        }, 3);
+    }
+
+    /**
+     * 到期望天数仍未确认收货的订单（自动确认的扫描入口）。
+     *
+     * 排除有未结退款单的：买家正在维权时，系统不能替他把钱放给卖家。
+     *
+     * @return \Illuminate\Support\Collection<int, Order>
+     */
+    public function autoConfirmDue(int $days, int $limit = 200): \Illuminate\Support\Collection
+    {
+        return Order::query()
+            ->where('status', OrderStatus::SellerShipped->value)
+            ->whereNotNull('shipped_at')
+            ->where('shipped_at', '<=', Carbon::now()->subDays(max(1, $days)))
+            ->whereNotExists(function ($query): void {
+                $query->from('refunds')
+                    ->whereColumn('refunds.order_id', 'orders.order_id')
+                    ->whereIn('refunds.status', [RefundStatus::Pending->value, RefundStatus::Failed->value]);
+            })
+            ->orderBy('order_id')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * 付款后超过 N 天仍未发货的订单（催办扫描入口）。
+     *
+     * @return \Illuminate\Support\Collection<int, Order>
+     */
+    public function paidUnshippedBefore(int $days, int $limit = 200): \Illuminate\Support\Collection
+    {
+        return Order::query()
+            ->where('status', OrderStatus::Paid->value)
+            ->whereNotNull('paid_at')
+            ->where('paid_at', '<=', Carbon::now()->subDays(max(1, $days)))
+            ->orderBy('order_id')
+            ->limit($limit)
+            ->get();
     }
 
     /** 释放到期未付款订单（调度调用；逐单加锁，单笔失败不影响批次） */

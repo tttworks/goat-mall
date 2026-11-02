@@ -14,6 +14,7 @@ use App\Models\Order;
 use App\Services\Market\QuoteService;
 use App\Services\Notify\NotificationService;
 use App\Services\Payment\PaymentService;
+use App\Services\Trade\OrderCompletionService;
 use App\Services\Trade\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,6 +33,7 @@ class OrderController extends Controller
         private readonly PaymentService $payments,
         private readonly NotificationService $notifications,
         private readonly QuoteService $quotes,
+        private readonly OrderCompletionService $completions,
     ) {}
 
     public function store(Request $request): JsonResponse
@@ -165,24 +167,9 @@ class OrderController extends Controller
     /** 买家确认收货：触发担保资金解冻（seller_shipped → buyer_confirmed → completed） */
     public function confirm(Request $request, int $orderId): JsonResponse
     {
-        $order = $this->orders->confirmReceipt((int) $request->user()->user_id, $orderId);
-
-        // 订单确认与资金结算分属两个服务：这里做编排，谁失败谁回滚自己的事务
-        if ((bool) config('goat.payment.escrow.auto_settle_on_confirm', true)) {
-            $this->payments->settleByOrder((int) $order->order_id);
-        }
-
-        // 成交价回写行情：recordFromOrder 内部吞异常，行情写失败不影响「已确认收货」这个事实
-        $this->quotes->recordFromOrder($order->load('items'));
-
-        $this->notifications->push(
-            (int) $order->seller_id,
-            'order.completed',
-            '买家已确认收货',
-            sprintf('订单 %s 已完成，货款已结算', $order->order_no),
-            ['order_id' => (int) $order->order_id],
-            'order:'.$order->order_id.':completed'
-        );
+        // 编排（状态机 → 结算 → 成交价回写 → 通知）统一在 OrderCompletionService：
+        // 超时自动确认走同一条路径，两处各写一遍必然漂移
+        $order = $this->completions->confirmByBuyer((int) $request->user()->user_id, $orderId);
 
         return response()->json(['data' => $this->payload($order, true)]);
     }

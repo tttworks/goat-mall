@@ -12,7 +12,9 @@
 
 use App\Enums\AuctionStatus;
 use App\Models\Auction;
+use App\Models\Order;
 use App\Services\Trade\BiddingService;
+use App\Services\Trade\OrderCompletionService;
 use App\Services\Trade\OrderService;
 use Illuminate\Support\Facades\Schedule;
 
@@ -20,6 +22,26 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::call(function (OrderService $orders): void {
     $orders->closeExpired(200);
 })->name('goat:orders:close-expired')->withoutOverlapping()->everyMinute();
+
+// 发货后长期未确认收货：系统代买家确认并结算（每小时）。
+// 买家可以一直不点，但担保款不能因此永久冻在平台；有未结退款单的订单会被 exclude。
+Schedule::call(function (OrderService $orders, OrderCompletionService $completions): void {
+    $days = (int) config('goat.trade.auto_confirm_days', 10);
+
+    $orders->autoConfirmDue($days)->each(function (Order $order) use ($completions, $days): void {
+        try {
+            $completions->confirmByTimeout($order, $days);
+        } catch (Throwable $e) {
+            report($e);
+        }
+    });
+})->name('goat:orders:auto-confirm')->withoutOverlapping()->hourly();
+
+// 付款后长期未发货：催办双方（每天一次）。
+// 只提醒不动资金——自动退款必须有人审，否则「已线下发货但没填单号」的卖家会货钱两空。
+Schedule::call(function (OrderCompletionService $completions): void {
+    $completions->nudgeUnshipped((int) config('goat.trade.unshipped_alert_days', 3));
+})->name('goat:orders:nudge-unshipped')->withoutOverlapping()->dailyAt('10:30');
 
 // 到点竞拍结束 + 结算（每分钟；逐条加锁，单条失败不影响批次）
 Schedule::call(function (BiddingService $bidding): void {

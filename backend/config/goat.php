@@ -32,6 +32,9 @@ return [
         'payment_timeout_minutes' => (int) env('GOAT_TRADE_PAYMENT_TIMEOUT_MINUTES', 30),
         // 已发货后自动确认收货（天），兜底买家不操作
         'auto_confirm_days' => (int) env('GOAT_TRADE_AUTO_CONFIRM_DAYS', 10),
+        // 付款后长期未发货的催办天数：只提醒双方，不动资金
+        // （自动退款必须有人审：担保期内秒退会让「已线下发货但没填单号」的卖家货钱两空）
+        'unshipped_alert_days' => (int) env('GOAT_TRADE_UNSHIPPED_ALERT_DAYS', 3),
         // 费率兜底（DB fee_rules 无命中时使用）；bip = 万分比，0 = 免费期
         'default_fee' => [
             'percent_bip' => (int) env('GOAT_TRADE_DEFAULT_FEE_BIP', 0),
