@@ -9,6 +9,7 @@
 
 namespace App\Services\Community;
 
+use App\Events\MessageSent;
 use App\Exceptions\SocialException;
 use App\Models\Conversation;
 use App\Models\Message;
@@ -17,6 +18,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 私信（T6）：会话归一化 + 消息落库 + 未读计数。
@@ -89,7 +91,7 @@ class ImService
         $conversation = $this->findMemberConversation($userId, $conversationId);
         $body = mb_substr($body, 0, $maxLength);
 
-        return DB::transaction(function () use ($conversation, $userId, $body) {
+        $message = DB::transaction(function () use ($conversation, $userId, $body) {
             $message = Message::query()->create([
                 'conversation_id' => (int) $conversation->conversation_id,
                 'sender_id' => $userId,
@@ -104,6 +106,10 @@ class ImService
 
             return $message;
         }, 3);
+
+        $this->broadcast($message, $conversation, $userId);
+
+        return $message;
     }
 
     /**
@@ -200,6 +206,27 @@ class ImService
             'read_at' => $message->read_at?->toIso8601String(),
             'created_at' => $message->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * 实时推送（T6）：只推给收信人；推送失败不影响发信结果。
+     *
+     * 事务外派发：避免收信人在消息提交前被推到一条「回查还查不到」的消息。
+     */
+    private function broadcast(Message $message, Conversation $conversation, int $senderId): void
+    {
+        if (! config('goat.ws.enabled')) {
+            return;
+        }
+
+        try {
+            MessageSent::dispatch($message, $conversation->peerOf($senderId));
+        } catch (\Throwable $e) {
+            Log::channel('security')->warning('im.推送失败', [
+                'message_id' => $message->message_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function findMemberConversation(int $userId, int $conversationId): Conversation

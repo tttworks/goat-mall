@@ -1,0 +1,117 @@
+/*
+ * GOAT 潮玩交易平台 / GOAT 潮玩数据采集
+ * Copyright © 火山文化科技（天津市火山文化科技有限责任公司）
+ * Author: Aloysius Luo
+ * 本文件为 GOAT 自有代码；第三方框架（Laravel / uni-app / 等）版权归各自权利人。
+ */
+
+:root {
+  --goat-ink: #0b0b0c;
+  --goat-ink-soft: #17171a;
+  --goat-accent: #d8ff3e;
+  --goat-line: #e6e6e8;
+  --goat-text: #1c1c1f;
+  --goat-text-dim: #76767f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, 'Segoe UI', sans-serif;
+  color: var(--goat-text);
+  background: #f5f5f6;
+  -webkit-font-smoothing: antialiased;
+}
+
+// 页面级通用排版：各视图只写业务，不重复写容器样式
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.page-desc {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--goat-text-dim);
+  line-height: 1.6;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--goat-line);
+  border-radius: 12px;
+}
+
+.table-card {
+  background: #fff;
+  border: 1px solid var(--goat-line);
+  border-radius: 12px;
+  padding: 4px 0 0;
+}
+
+.table-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 16px;
+}
+
+.cell-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #f0f0f2;
+}
+
+.cell-title {
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.cell-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--goat-text-dim);
+}
+
+.mono {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 12px;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--goat-ink);
+  --el-button-border-color: var(--goat-ink);
+  --el-button-hover-bg-color: #2a2a2e;
+  --el-button-hover-border-color: #2a2a2e;
+  --el-button-active-bg-color: #000;
+}

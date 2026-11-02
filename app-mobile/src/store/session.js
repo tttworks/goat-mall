@@ -7,6 +7,7 @@
 
 import { reactive } from 'vue'
 import { fetchMe } from '../api/auth'
+import { closeRealtime } from '../realtime/client'
 import { clearAuthCache, getCachedUser, getToken, setCachedUser, setToken } from '../utils/storage'
 
 /**
@@ -39,6 +40,8 @@ export function signIn(payload) {
 export function signOut() {
   state.user = null
   clearAuthCache()
+  // 必须断开 WS：否则换号登录后仍会收到上一个账号的私信与通知
+  closeRealtime()
 }
 
 /** 请求层捕获 401 后会广播，这里清掉内存态，避免界面还显示着旧用户 */

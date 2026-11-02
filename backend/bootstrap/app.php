@@ -86,5 +86,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return response()->json(['message' => $e->getMessage(), 'code' => $e->errorCode], $e->statusCode);
         });
+
+        // 采集系统交互（契约 §4）：503 未配置 / 502 上游失败。跨系统故障必须可区分，便于运维定责
+        $exceptions->render(function (\App\Exceptions\CollectorException $e, Request $request) {
+            return response()->json(['message' => $e->getMessage(), 'code' => $e->errorCode], $e->statusCode);
+        });
     })
     ->create();

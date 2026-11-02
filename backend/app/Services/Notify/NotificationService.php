@@ -9,10 +9,12 @@
 
 namespace App\Services\Notify;
 
+use App\Events\NotificationCreated;
 use App\Models\UserNotification;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 通知中心写入/读取（T6）。
@@ -39,7 +41,7 @@ class NotificationService
         }
 
         try {
-            return UserNotification::query()->create([
+            $notification = UserNotification::query()->create([
                 'user_id' => $userId,
                 'type' => $type,
                 'title' => mb_substr($title, 0, 120),
@@ -48,10 +50,34 @@ class NotificationService
                 'dedupe_key' => $dedupeKey,
             ]);
         } catch (UniqueConstraintViolationException) {
-            // 同一事件重复推送：返回首条，不再写第二条
+            // 同一事件重复推送：返回首条，不再写第二条（也不再广播，否则渠道重推会刷屏）
             return $dedupeKey === null
                 ? null
                 : UserNotification::query()->where('dedupe_key', $dedupeKey)->first();
+        }
+
+        $this->broadcast($notification);
+
+        return $notification;
+    }
+
+    /** 实时角标推送（T6）：失败一律吞掉——通知本身已写库，推送只是锦上添花 */
+    private function broadcast(UserNotification $notification): void
+    {
+        if (! config('goat.ws.enabled')) {
+            return;
+        }
+
+        try {
+            NotificationCreated::dispatch(
+                $notification,
+                $this->unreadCount((int) $notification->user_id)
+            );
+        } catch (\Throwable $e) {
+            Log::channel('security')->warning('notify.推送失败', [
+                'notification_id' => $notification->notification_id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

@@ -11,12 +11,14 @@
  * 追加时用独立 Route::prefix() 分组，避免与其他 agent 改同一行。
  */
 
+use App\Http\Controllers\Api\Admin\CollectorController as AdminCollectorController;
 use App\Http\Controllers\Api\Admin\FigureController as AdminFigureController;
 use App\Http\Controllers\Api\Admin\ListingController as AdminListingController;
 use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Api\Admin\PostController as AdminPostController;
 use App\Http\Controllers\Api\AuctionController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BroadcastAuthController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\FavoriteController;
@@ -29,6 +31,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PostController;
+use App\Http\Controllers\Api\RealtimeController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\SellerAuctionController;
 use App\Http\Controllers\Api\SellerController;
@@ -42,6 +45,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::post('/payments/notify', [PaymentController::class, 'notify'])
         ->middleware('throttle:120,1')
         ->name('payments.notify');
+
+    // ---------------- 实时推送（T6）----------------
+    // 端点配置公开下发（只含公开 app key）；频道鉴权必须带 Token，与 HTTP 接口同一套身份
+    Route::get('/realtime/config', [RealtimeController::class, 'config'])->name('realtime.config');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/broadcasting/auth', BroadcastAuthController::class)->name('broadcasting.auth');
+    });
 
     // ---------------- 认证与用户（T2）----------------
     Route::prefix('auth')->name('auth.')->group(function () {
@@ -76,6 +87,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
     // 后台审核（T2，仅 admin）
     Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/sellers', [SellerController::class, 'adminIndex'])->name('sellers.index');
         Route::post('/sellers/{seller}/review', [SellerController::class, 'review'])
             ->whereNumber('seller')->name('sellers.review');
     });
@@ -236,5 +248,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/posts', [AdminPostController::class, 'index'])->name('posts.index');
         Route::post('/posts/{post}/review', [AdminPostController::class, 'review'])
             ->whereNumber('post')->name('posts.review');
+    });
+
+    // ---------------- 采集触发（T7，仅 admin，契约 §4）----------------
+    Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin/collector')->name('admin.collector.')->group(function () {
+        Route::post('/crawl-figure', [AdminCollectorController::class, 'crawlFigure'])->name('figure');
+        Route::post('/crawl-price', [AdminCollectorController::class, 'crawlPrice'])->name('price');
+        Route::get('/job/{job}', [AdminCollectorController::class, 'job'])
+            ->where('job', '[A-Za-z0-9\-_]{1,64}')->name('job');
     });
 });

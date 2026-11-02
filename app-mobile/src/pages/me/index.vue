@@ -66,13 +66,15 @@
 
 <script setup>
 import { ref } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onUnload } from '@dcloudio/uni-app'
 import { logout as logoutApi } from '../../api/auth'
 import { listNotifications } from '../../api/social'
+import { onUserEvent } from '../../realtime/client'
 import { isLoggedIn, session, signOut } from '../../store/session'
 import { confirmModal, toast } from '../../utils/ui'
 
 const unread = ref(0)
+let offRealtime = null
 
 const ROLE_LABELS = { buyer: '买家', seller: '卖家', admin: '平台运营' }
 
@@ -125,8 +127,27 @@ async function doLogout() {
   toast('已退出登录')
 }
 
+/** 角标实时化（T6）：服务端推送自带 unread_count，不必再打一次列表接口 */
+function listenRealtime() {
+  const userId = session.user?.user_id
+  if (!userId || offRealtime) return
+
+  offRealtime = onUserEvent(userId, (event, data) => {
+    if (event !== 'notify.created') return
+    unread.value = Number(data?.unread_count ?? unread.value + 1)
+  })
+}
+
 onShow(() => {
   loadUnread()
+  listenRealtime()
+})
+
+onUnload(() => {
+  if (offRealtime) {
+    offRealtime()
+    offRealtime = null
+  }
 })
 </script>
 

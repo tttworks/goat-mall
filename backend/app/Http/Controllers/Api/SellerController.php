@@ -73,6 +73,40 @@ class SellerController
         ], 201);
     }
 
+    /** 后台店铺列表（admin）：默认待审核，可按状态筛选 */
+    public function adminIndex(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'status' => ['nullable', 'string', 'max:24'],
+            'per_page' => ['nullable', 'integer', 'between:1,50'],
+        ]);
+
+        $page = $this->seller->paginate(
+            $validated['status'] ?? SellerStatus::Pending->value,
+            (int) ($validated['per_page'] ?? 20)
+        );
+
+        return response()->json([
+            'data' => array_map(function (SellerProfile $profile): array {
+                return $this->payload($profile) + [
+                    'owner' => [
+                        'user_id' => (int) $profile->user_id,
+                        'nickname' => $profile->user?->nickname,
+                    ],
+                ];
+            }, $page->items()),
+            'meta' => [
+                'total' => $page->total(),
+                'page' => $page->currentPage(),
+                'per_page' => $page->perPage(),
+                'statuses' => array_map(
+                    static fn (SellerStatus $status) => ['value' => $status->value, 'label' => $status->label()],
+                    SellerStatus::cases()
+                ),
+            ],
+        ]);
+    }
+
     /** 后台审核（admin）：approve / reject / suspend */
     public function review(SellerReviewRequest $request, SellerProfile $seller): JsonResponse
     {

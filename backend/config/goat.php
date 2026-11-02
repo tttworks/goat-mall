@@ -144,10 +144,20 @@ return [
         'timeout' => (int) env('GOAT_MODERATION_TIMEOUT', 5),
     ],
 
-    // 私信（T6）：本轮为 HTTP 拉取，实时推送（WS）留后续，表结构已按增量拉取设计
+    // 私信（T6）：HTTP 拉取为兜底，WS 只做「增量提示」，断开也不影响可用性
     'im' => [
         'max_length' => (int) env('GOAT_IM_MAX_LENGTH', 1000),
-        'ws_enabled' => (bool) env('GOAT_IM_WS_ENABLED', false),
+    ],
+
+    // 实时推送总开关（T6）：Reverb 未部署时保持关闭，业务照旧走 HTTP 拉取。
+    // 关闭时事件不派发 —— 不是「派发到黑洞」，避免队列里堆无意义的广播 job。
+    'ws' => [
+        'enabled' => (bool) env('GOAT_WS_ENABLED', false),
+        // 客户端订阅用的公开地址（写入 /api/v1/realtime/config 下发给前端）
+        'app_key' => env('REVERB_APP_KEY', ''),
+        'host' => env('REVERB_HOST', ''),
+        'port' => (int) env('REVERB_PORT', 443),
+        'scheme' => env('REVERB_SCHEME', 'https'),
     ],
 
     // 采集系统内部 API（契约 §4；HMAC 密钥只存服务器环境）
@@ -155,6 +165,16 @@ return [
         'base_url' => env('COLLECTOR_BASE_URL', ''),
         'hmac_key' => env('COLLECTOR_HMAC_KEY', ''),
         'hmac_ttl' => (int) env('COLLECTOR_HMAC_TTL', 300),
+        // 触发是异步任务（202 + job_id），不需要长超时；卡住就快速失败，让运营重试
+        'timeout' => (int) env('COLLECTOR_TIMEOUT', 10),
+    ],
+
+    // 首个运营管理员（仅 AdminUserSeeder 读取）
+    // password 留空 = 随机生成并在 seed 输出里打印一次；显式配置 = 重置为该值
+    'admin' => [
+        'username' => env('GOAT_ADMIN_USERNAME', 'admin'),
+        'email' => env('GOAT_ADMIN_EMAIL'),
+        'password' => env('GOAT_ADMIN_PASSWORD'),
     ],
 
 ];

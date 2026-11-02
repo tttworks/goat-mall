@@ -36,6 +36,22 @@ class SellerOnboardingService
     }
 
     /**
+     * 后台店铺列表：默认只出待审核，避免运营在几百个已开业店铺里翻。
+     *
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     */
+    public function paginate(?string $status, int $perPage = 20)
+    {
+        return SellerProfile::query()
+            ->when($status !== null && $status !== '', fn ($query) => $query->where('status', $status))
+            ->with('user')
+            // 审核队列：先提交先审
+            ->orderBy('applied_at')
+            ->orderBy('seller_id')
+            ->paginate($perPage);
+    }
+
+    /**
      * 提交开店申请（可重复提交：上次被拒后可改资料再提）。
      *
      * @param  array{shop_name: string, shop_intro?: string|null, shop_logo_key?: string|null}  $data

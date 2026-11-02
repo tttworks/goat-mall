@@ -53,8 +53,10 @@
 
 <script setup>
 import { nextTick, ref } from 'vue'
-import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
+import { onLoad, onPullDownRefresh, onUnload } from '@dcloudio/uni-app'
 import { listMessages, sendMessage } from '../../api/social'
+import { onUserEvent } from '../../realtime/client'
+import { session } from '../../store/session'
 import { relativeTime } from '../../utils/format'
 import { toast } from '../../utils/ui'
 
@@ -63,6 +65,7 @@ const messages = ref([])
 const draft = ref('')
 const sending = ref(false)
 const anchor = ref('')
+let offRealtime = null
 
 async function load() {
   if (!conversationId.value) return
@@ -103,6 +106,28 @@ async function send() {
   }
 }
 
+/**
+ * 实时补消息（T6）：WS 只做「提示」，历史仍以 HTTP 为准。
+ *
+ * 三条护栏：
+ * 1. 只认本会话（同一用户可能开着别的会话连接）；
+ * 2. 按 message_id 去重——HTTP 拉取与推送可能同时到达同一条；
+ * 3. 收到的只会是对端消息（服务端只推给收信人），因此 is_mine 恒为 false。
+ */
+function listenRealtime() {
+  const userId = session.user?.user_id
+  if (!userId) return
+
+  offRealtime = onUserEvent(userId, (event, data) => {
+    if (event !== 'im.message') return
+    if (Number(data?.conversation_id) !== conversationId.value) return
+    if (messages.value.some((item) => item.message_id === data.message_id)) return
+
+    messages.value.push({ ...data, is_mine: false })
+    scrollToBottom()
+  })
+}
+
 onLoad((options) => {
   conversationId.value = Number(options?.id || 0)
   if (!conversationId.value) {
@@ -114,7 +139,14 @@ onLoad((options) => {
     uni.setNavigationBarTitle({ title: decodeURIComponent(options.title) })
   }
 
-  load()
+  load().then(listenRealtime)
+})
+
+onUnload(() => {
+  if (offRealtime) {
+    offRealtime()
+    offRealtime = null
+  }
 })
 
 onPullDownRefresh(async () => {

@@ -10,12 +10,15 @@
 namespace App\Services\Trade;
 
 use App\Enums\AuctionStatus;
+use App\Events\BidPlaced;
 use App\Exceptions\TradeException;
 use App\Models\Auction;
 use App\Models\Bid;
+use App\Models\User;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 竞拍出价（T4 · 防狙击 + 竞态）。
@@ -44,7 +47,7 @@ class BiddingService
 
         $amountCents = Money::toCents($amount);
 
-        return DB::transaction(function () use ($auctionId, $bidderId, $amountCents, $idempotencyKey) {
+        $result = DB::transaction(function () use ($auctionId, $bidderId, $amountCents, $idempotencyKey) {
             /** @var Auction $auction */
             $auction = Auction::query()->whereKey($auctionId)->lockForUpdate()->firstOrFail();
             $now = Carbon::now();
@@ -107,6 +110,45 @@ class BiddingService
 
             return ['bid' => $bid, 'auction' => $auction->fresh(), 'replayed' => false, 'extended' => $extended];
         }, 3);
+
+        // 幂等回放不广播：重试不是新的一口价，推了会让围观者看到「同一价被出两次」
+        if (! $result['replayed']) {
+            $this->broadcast($result['auction'], $result['bid'], $bidderId, $result['extended']);
+        }
+
+        return $result;
+    }
+
+    /** 公开频道推送（T6）：只给脱敏名与价格，推送失败不影响出价结果 */
+    private function broadcast(Auction $auction, Bid $bid, int $bidderId, bool $extended): void
+    {
+        if (! config('goat.ws.enabled')) {
+            return;
+        }
+
+        try {
+            BidPlaced::dispatch($auction, $bid, $this->maskBidderName($bidderId), $extended);
+        } catch (\Throwable $e) {
+            Log::channel('security')->warning('auction.推送失败', [
+                'auction_id' => $auction->auction_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * 买家脱敏名：昵称首字 + `**`；无昵称则退化「买家」。
+     * 公开频道不暴露 bidder_id —— 否则等于把某人的竞价记录公开挂出来。
+     */
+    private function maskBidderName(int $bidderId): string
+    {
+        $nickname = User::query()->whereKey($bidderId)->value('nickname');
+
+        if (! is_string($nickname) || $nickname === '') {
+            return '买家';
+        }
+
+        return mb_substr($nickname, 0, 1).'**';
     }
 
     /**

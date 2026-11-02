@@ -165,8 +165,18 @@ class PostService
 
     public function pendingPaginate(int $perPage = 20): LengthAwarePaginator
     {
+        return $this->paginate(PostStatus::Pending->value, $perPage);
+    }
+
+    /**
+     * 后台帖子队列：默认待审，也可回看已通过/已驳回（申诉与复盘需要）。
+     *
+     * 只改筛选不改排序：`post_id` 升序 = 先到先审，避免审核顺序随机。
+     */
+    public function paginate(?string $status, int $perPage = 20): LengthAwarePaginator
+    {
         return Post::query()
-            ->where('status', PostStatus::Pending->value)
+            ->where('status', $status !== null && $status !== '' ? $status : PostStatus::Pending->value)
             ->orderBy('post_id')
             ->paginate($perPage);
     }
