@@ -15,6 +15,20 @@
       }
     },
     {
+      "path": "pages/community/post",
+      "style": {
+        "navigationBarTitleText": "帖子详情",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/community/mine",
+      "style": {
+        "navigationBarTitleText": "我的帖子",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/me/index",
       "style": {
         "navigationBarTitleText": "我的"

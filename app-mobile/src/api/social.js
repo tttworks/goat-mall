@@ -64,6 +64,32 @@ export function uploadPostImage(filePath) {
   return upload('/posts/media', filePath, { name: 'file' })
 }
 
+/* ---------- 点赞（幂等：POST 点赞 / DELETE 取消） ---------- */
+export function likePost(postId) {
+  return http.post(`/posts/${postId}/like`)
+}
+
+export function unlikePost(postId) {
+  return http.del(`/posts/${postId}/like`)
+}
+
+/* ---------- 评论 ---------- */
+export function getPost(postId) {
+  return http.get(`/posts/${postId}`, { silent: true })
+}
+
+export function listComments(postId, params = {}) {
+  return http.get(`/posts/${postId}/comments`, { data: params, silent: true })
+}
+
+export function createComment(postId, content) {
+  return http.post(`/posts/${postId}/comments`, { content })
+}
+
+export function deleteComment(postId, commentId) {
+  return http.del(`/posts/${postId}/comments/${commentId}`)
+}
+
 /* ---------- 举报 ---------- */
 export function submitReport({ targetType, targetId, reason, detail = '' }) {
   return http.post('/reports', {

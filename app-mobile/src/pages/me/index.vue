@@ -63,6 +63,11 @@
         <text class="entry__label">退款/售后</text>
         <text class="entry__arrow">›</text>
       </view>
+      <view class="entry" @tap="go('/pages/community/mine')">
+        <text class="entry__icon">◇</text>
+        <text class="entry__label">我的帖子</text>
+        <text class="entry__arrow">›</text>
+      </view>
     </view>
 
     <view class="g-card entries">

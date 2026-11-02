@@ -7,6 +7,11 @@
 
 <template>
   <view class="community">
+    <view class="community__head">
+      <text class="community__title">玩家社群</text>
+      <text class="community__mine" @tap="openMine">我的帖子</text>
+    </view>
+
     <view class="g-card composer">
       <textarea
         v-model="draft"
@@ -44,7 +49,7 @@
     </view>
 
     <view v-if="posts.length" class="posts">
-      <view v-for="post in posts" :key="post.post_id" class="g-card post">
+      <view v-for="post in posts" :key="post.post_id" class="g-card post" @tap="openPost(post)">
         <view class="post__head">
           <image v-if="post.author?.avatar_url" class="post__avatar" :src="post.author.avatar_url" mode="aspectFill" />
           <view v-else class="post__avatar post__avatar--empty">
@@ -66,8 +71,19 @@
             class="post__image"
             :src="url"
             mode="aspectFill"
-            @tap="preview(post.images, index)"
+            @tap.stop="preview(post.images, index)"
           />
+        </view>
+
+        <view class="post__actions">
+          <view class="post__action" :class="{ 'post__action--on': post.liked }" @tap.stop="toggleLike(post)">
+            <text class="post__action-icon">{{ post.liked ? '♥' : '♡' }}</text>
+            <text class="post__action-count">{{ post.likes_count || 0 }}</text>
+          </view>
+          <view class="post__action" @tap.stop="openPost(post)">
+            <text class="post__action-label">评论</text>
+            <text class="post__action-count">{{ post.comments_count || 0 }}</text>
+          </view>
         </view>
       </view>
     </view>
@@ -84,7 +100,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
-import { createPost, listPosts, uploadPostImage } from '../../api/social'
+import { createPost, likePost, listPosts, unlikePost, uploadPostImage } from '../../api/social'
 import { requireLogin, session } from '../../store/session'
 import { relativeTime } from '../../utils/format'
 import { toast } from '../../utils/ui'
@@ -95,6 +111,7 @@ const draft = ref('')
 const images = ref([])
 const uploading = ref(false)
 const publishing = ref(false)
+const likingId = ref(0)
 const loading = ref(false)
 const hasMore = ref(true)
 const page = ref(1)
@@ -108,6 +125,34 @@ const canPublish = computed(() => {
 function canReport(post) {
   const me = session.user?.user_id
   return Boolean(me) && Number(post.author?.user_id) !== Number(me)
+}
+
+function openMine() {
+  uni.navigateTo({ url: '/pages/community/mine' })
+}
+
+function openPost(post) {
+  uni.navigateTo({ url: `/pages/community/post?id=${post.post_id}` })
+}
+
+/**
+ * 点赞用「显式点赞/取消」而非 toggle：连点两次的最后状态由服务端返回决定，
+ * 弱网重试也不会出现「点赞把赞取消」的翻车。
+ */
+async function toggleLike(post) {
+  if (!requireLogin()) return
+  if (likingId.value) return
+
+  likingId.value = post.post_id
+  try {
+    const payload = post.liked ? await unlikePost(post.post_id) : await likePost(post.post_id)
+    post.liked = Boolean(payload.data?.liked)
+    post.likes_count = Number(payload.data?.likes_count || 0)
+  } catch (e) {
+    // 请求层已提示
+  } finally {
+    likingId.value = null
+  }
 }
 
 /** 逐张上传：uni.chooseImage 一次可多选，但接口只收单文件，串行上传给用户确定的进度反馈 */
@@ -235,6 +280,24 @@ load(true)
   padding: 24rpx 24rpx 48rpx;
 }
 
+.community__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.community__title {
+  color: $goat-text;
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+.community__mine {
+  color: $goat-accent;
+  font-size: 26rpx;
+}
+
 .composer {
   display: flex;
   flex-direction: column;
@@ -309,6 +372,39 @@ load(true)
   flex-shrink: 0;
   padding-left: 16rpx;
   color: $goat-text-dim;
+  font-size: 24rpx;
+}
+
+.post__actions {
+  display: flex;
+  align-items: center;
+  gap: 40rpx;
+  margin-top: 20rpx;
+  padding-top: 18rpx;
+  border-top: 1rpx solid $goat-border;
+}
+
+.post__action {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  color: $goat-text-dim;
+}
+
+.post__action--on {
+  color: #e0507a;
+}
+
+.post__action-icon {
+  font-size: 32rpx;
+  line-height: 1;
+}
+
+.post__action-label {
+  font-size: 24rpx;
+}
+
+.post__action-count {
   font-size: 24rpx;
 }
 
