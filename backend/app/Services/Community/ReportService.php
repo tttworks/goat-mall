@@ -15,6 +15,7 @@ use App\Enums\ReportTargetType;
 use App\Exceptions\SocialException;
 use App\Models\Listing;
 use App\Models\Post;
+use App\Models\PostComment;
 use App\Models\Report;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -116,6 +117,23 @@ class ReportService
 
                 return (int) $post->user_id;
 
+            case ReportTargetType::Comment:
+                $comment = PostComment::query()->whereKey($targetId)->first();
+
+                if ($comment === null || ! $comment->isVisible()) {
+                    throw SocialException::notFound('评论不存在或已删除');
+                }
+
+                // 帖子被下架时评论也不再公开展示，对举报人同样按「不存在」处理，
+                // 避免举报入口变成探测他人私有内容的探针。
+                $post = Post::query()->whereKey($comment->post_id)->first();
+
+                if ($post === null || ! $post->isVisible()) {
+                    throw SocialException::notFound('评论不存在或已删除');
+                }
+
+                return (int) $comment->user_id;
+
             case ReportTargetType::User:
                 $user = User::query()->whereKey($targetId)->first();
 
@@ -159,6 +177,10 @@ class ReportService
             ->whereIn('post_id', $ids[ReportTargetType::Post->value] ?? [])
             ->get()
             ->keyBy('post_id');
+        $comments = PostComment::withTrashed()
+            ->whereIn('comment_id', $ids[ReportTargetType::Comment->value] ?? [])
+            ->get()
+            ->keyBy('comment_id');
         $users = User::query()
             ->whereIn('user_id', $ids[ReportTargetType::User->value] ?? [])
             ->get()
@@ -178,7 +200,7 @@ class ReportService
             ->get()
             ->keyBy('user_id');
 
-        return array_map(function (Report $report) use ($listings, $posts, $users, $people) {
+        return array_map(function (Report $report) use ($listings, $posts, $comments, $users, $people) {
             [$title, $ownerId] = match ($report->target_type) {
                 ReportTargetType::Listing => [
                     (string) ($listings[$report->target_id]->title ?? '（商品已删除）'),
@@ -187,6 +209,10 @@ class ReportService
                 ReportTargetType::Post => [
                     $this->postTitle($posts[$report->target_id] ?? null),
                     (int) ($posts[$report->target_id]->user_id ?? 0),
+                ],
+                ReportTargetType::Comment => [
+                    $this->commentTitle($comments[$report->target_id] ?? null),
+                    (int) ($comments[$report->target_id]->user_id ?? 0),
                 ],
                 ReportTargetType::User => [
                     (string) ($users[$report->target_id]->nickname ?? $users[$report->target_id]->username ?? '（用户已注销）'),
@@ -225,6 +251,18 @@ class ReportService
         $text = $text === '' ? '（纯图片帖）' : mb_substr($text, 0, 60);
 
         return $post->trashed() ? '【已删除】'.$text : $text;
+    }
+
+    /** 评论标题：带「评论：」前缀，后台队列里一眼区分「报的是帖」还是「报的是某条评论」 */
+    private function commentTitle(?PostComment $comment): string
+    {
+        if ($comment === null) {
+            return '（评论已删除）';
+        }
+
+        $text = '评论：'.mb_substr(trim((string) $comment->content), 0, 60);
+
+        return $comment->trashed() ? '【已删除】'.$text : $text;
     }
 
     /** @return array<string, mixed>|null */

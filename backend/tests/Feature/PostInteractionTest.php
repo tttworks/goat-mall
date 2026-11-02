@@ -9,10 +9,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\CommentStatus;
 use App\Enums\PostStatus;
 use App\Models\Post;
 use App\Models\PostComment;
+use App\Models\Report;
 use App\Models\User;
+use App\Models\UserNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -222,5 +225,106 @@ class PostInteractionTest extends TestCase
             ->assertJsonPath('data.0.status', 'withdrawn');
 
         $this->getJson('/api/v1/me/posts?status=unknown')->assertStatus(422);
+    }
+
+    public function test_interactions_notify_author_but_never_self(): void
+    {
+        $author = $this->makeUser('notify_author');
+        $fan = $this->makeUser('notify_fan');
+        $post = $this->makePost($author);
+
+        Sanctum::actingAs($fan);
+
+        $this->postJson("/api/v1/posts/{$post->post_id}/like")->assertOk();
+        // 重复点赞不再产生第二条（幂等 + 去重键）
+        $this->postJson("/api/v1/posts/{$post->post_id}/like")->assertOk();
+
+        $this->postJson("/api/v1/posts/{$post->post_id}/comments", ['content' => '这条我也想要'])
+            ->assertCreated();
+
+        $this->assertSame(1, UserNotification::query()
+            ->where('user_id', $author->user_id)
+            ->where('type', 'post.liked')
+            ->count());
+
+        $commented = UserNotification::query()
+            ->where('user_id', $author->user_id)
+            ->where('type', 'post.commented')
+            ->firstOrFail();
+
+        $this->assertStringContainsString('这条我也想要', (string) $commented->body);
+        $this->assertSame((int) $post->post_id, (int) ($commented->payload['post_id'] ?? 0));
+
+        // 自己赞自己 / 自己评自己：不提醒，避免自娱自乐刷满通知中心
+        Sanctum::actingAs($author);
+        $before = UserNotification::query()->where('user_id', $author->user_id)->count();
+
+        $this->postJson("/api/v1/posts/{$post->post_id}/like")->assertOk();
+        $this->postJson("/api/v1/posts/{$post->post_id}/comments", ['content' => '自评一句'])->assertCreated();
+
+        $this->assertSame($before, UserNotification::query()->where('user_id', $author->user_id)->count());
+    }
+
+    public function test_comment_can_be_reported_and_hidden_targets_return_404(): void
+    {
+        $author = $this->makeUser('creport_author');
+        $fan = $this->makeUser('creport_fan');
+        $post = $this->makePost($author);
+
+        Sanctum::actingAs($fan);
+        $commentId = (int) $this->postJson("/api/v1/posts/{$post->post_id}/comments", ['content' => '加我微信卖你低价'])
+            ->assertCreated()
+            ->json('data.comment_id');
+
+        // 别人举报该评论：工单只记 target_type=comment
+        Sanctum::actingAs($author);
+        $this->postJson('/api/v1/reports', [
+            'target_type' => 'comment',
+            'target_id' => $commentId,
+            'reason' => 'spam',
+        ])->assertCreated()->assertJsonPath('data.status', 'pending');
+
+        // 重复举报待处理中的同一评论：409
+        $this->postJson('/api/v1/reports', [
+            'target_type' => 'comment',
+            'target_id' => $commentId,
+            'reason' => 'spam',
+        ])->assertStatus(409);
+
+        // 评论作者举报自己的评论：422
+        Sanctum::actingAs($fan);
+        $this->postJson('/api/v1/reports', [
+            'target_type' => 'comment',
+            'target_id' => $commentId,
+            'reason' => 'other',
+        ])->assertStatus(422);
+
+        $this->assertSame(1, Report::query()->where('target_type', 'comment')->count());
+
+        // 已删除的评论按「不存在」处理，不用 403 泄露它曾经存在
+        Sanctum::actingAs($fan);
+        $this->deleteJson("/api/v1/posts/{$post->post_id}/comments/{$commentId}")->assertOk();
+
+        Sanctum::actingAs($author);
+        $this->postJson('/api/v1/reports', [
+            'target_type' => 'comment',
+            'target_id' => $commentId,
+            'reason' => 'spam',
+        ])->assertStatus(404);
+
+        // 未过审的评论同样不可举报
+        $hidden = PostComment::query()->create([
+            'post_id' => $post->post_id,
+            'user_id' => $fan->user_id,
+            'content' => '待审评论',
+            'status' => CommentStatus::Pending,
+        ]);
+
+        Sanctum::actingAs($author);
+        $this->postJson('/api/v1/reports', [
+            'target_type' => 'comment',
+            'target_id' => $hidden->comment_id,
+            'reason' => 'abuse',
+        ])->assertStatus(404);
     }
 }

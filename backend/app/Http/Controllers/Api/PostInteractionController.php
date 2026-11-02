@@ -10,9 +10,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\CommentStoreRequest;
+use App\Models\Post;
 use App\Models\PostComment;
 use App\Services\Community\CommentService;
 use App\Services\Community\PostService;
+use App\Services\Notify\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -29,13 +31,28 @@ class PostInteractionController extends Controller
     public function __construct(
         private readonly PostService $posts,
         private readonly CommentService $comments,
+        private readonly NotificationService $notifications,
     ) {}
 
     public function like(Request $request, int $post): JsonResponse
     {
-        return response()->json([
-            'data' => $this->posts->like((int) $request->user()->user_id, $post),
-        ]);
+        $userId = (int) $request->user()->user_id;
+        $result = $this->posts->like($userId, $post);
+
+        // 只在「从未点赞变成已点赞」时提醒：重复点赞不刷屏；
+        // 去重键按 (帖子, 点赞人)，取消再点也不会重复通知作者。
+        if ($result['liked']) {
+            $this->notifyAuthor(
+                $post,
+                $userId,
+                'post.liked',
+                '有人赞了你的帖子',
+                $this->actorName($request).'赞了你的帖子',
+                'post:'.$post.':like:'.$userId
+            );
+        }
+
+        return response()->json(['data' => $result]);
     }
 
     public function unlike(Request $request, int $post): JsonResponse
@@ -69,11 +86,20 @@ class PostInteractionController extends Controller
 
     public function createComment(CommentStoreRequest $request, int $post): JsonResponse
     {
-        $comment = $this->comments->create(
-            (int) $request->user()->user_id,
-            $post,
-            (string) $request->validated('content')
-        );
+        $userId = (int) $request->user()->user_id;
+        $comment = $this->comments->create($userId, $post, (string) $request->validated('content'));
+
+        // 待审评论不通知：还没展示出来就提醒作者「有人评论」，点进去却发现列表是空的
+        if ($comment->isVisible()) {
+            $this->notifyAuthor(
+                $post,
+                $userId,
+                'post.commented',
+                '有人评论了你的帖子',
+                $this->actorName($request).'：'.mb_substr((string) $comment->content, 0, 60),
+                'comment:'.$comment->comment_id.':created'
+            );
+        }
 
         return response()->json([
             'data' => $this->comments->payload($comment),
@@ -86,5 +112,42 @@ class PostInteractionController extends Controller
         $this->comments->delete((int) $request->user()->user_id, $post, $comment);
 
         return response()->json(['message' => '评论已删除']);
+    }
+
+    /**
+     * 内容被互动时提醒作者，自己赞自己/评自己不提醒。
+     *
+     * 通知是副作用，失败不能影响互动本身——NotificationService::push 内部已吞异常，
+     * 这里再兜一层「帖子查不到就直接跳过」。
+     */
+    private function notifyAuthor(
+        int $postId,
+        int $actorId,
+        string $type,
+        string $title,
+        string $body,
+        string $dedupeKey
+    ): void {
+        $authorId = (int) Post::query()->whereKey($postId)->value('user_id');
+
+        if ($authorId <= 0 || $authorId === $actorId) {
+            return;
+        }
+
+        $this->notifications->push(
+            $authorId,
+            $type,
+            $title,
+            $body,
+            ['post_id' => $postId],
+            $dedupeKey
+        );
+    }
+
+    private function actorName(Request $request): string
+    {
+        $user = $request->user();
+
+        return (string) ($user?->nickname ?: $user?->username ?: '有人');
     }
 }
