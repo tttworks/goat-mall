@@ -71,3 +71,26 @@ export function listMessages(conversationId, params = {}) {
 export function sendMessage(conversationId, body) {
   return http.post(`/conversations/${conversationId}/messages`, { body })
 }
+
+/* ---------- 评价回复 ---------- */
+export function replyReview(reviewId, content) {
+  return http.post(`/reviews/${reviewId}/reply`, { content })
+}
+
+/* ---------- 购物车 ---------- */
+/** 列表里每行自带 purchasable：商品被别人买走后行仍保留，靠它置灰而不是直接消失 */
+export function listCart() {
+  return http.get('/me/cart', { silent: true })
+}
+
+export function addToCart(listingId) {
+  return http.post('/me/cart', { listing_id: listingId })
+}
+
+export function removeFromCart(listingId) {
+  return http.del(`/me/cart/${listingId}`)
+}
+
+export function clearCart() {
+  return http.del('/me/cart')
+}

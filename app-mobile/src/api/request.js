@@ -88,7 +88,52 @@ export function request(path, options = {}) {
 export const http = {
   get: (path, options) => request(path, { ...options, method: 'GET' }),
   post: (path, data, options) => request(path, { ...options, method: 'POST', data }),
+  put: (path, data, options) => request(path, { ...options, method: 'PUT', data }),
+  patch: (path, data, options) => request(path, { ...options, method: 'PATCH', data }),
   del: (path, options) => request(path, { ...options, method: 'DELETE' })
+}
+
+/**
+ * 文件上传（uni.uploadFile 不支持走 request 的 JSON 通道，必须单独封一层）。
+ *
+ * 与 request 保持同样的三条约定：域名只在 api 层出现、token 自动带、错误统一 Toast。
+ */
+export function upload(path, filePath, { name = 'file', formData = {}, silent = false } = {}) {
+  const token = getToken()
+
+  return new Promise((resolve, reject) => {
+    uni.uploadFile({
+      url: `${BASE_URL}${path}`,
+      filePath,
+      name,
+      formData,
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success: (res) => {
+        let payload = res.data
+        try {
+          payload = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
+        } catch (e) {
+          payload = null
+        }
+
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(payload)
+          return
+        }
+
+        if (res.statusCode === 401) handleUnauthorized()
+
+        const message = pickMessage(payload, res.statusCode)
+        if (!silent) uni.showToast({ title: message, icon: 'none', duration: 2200 })
+        reject(Object.assign(new Error(message), { statusCode: res.statusCode, payload }))
+      },
+      fail: (err) => {
+        const message = '图片上传失败，请重试'
+        if (!silent) uni.showToast({ title: message, icon: 'none' })
+        reject(Object.assign(new Error(message), { cause: err }))
+      }
+    })
+  })
 }
 
 /**

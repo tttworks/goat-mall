@@ -83,6 +83,28 @@
           >
             <text>评价卖家</text>
           </view>
+          <view
+            v-if="canRefund(order)"
+            class="g-btn g-btn--ghost g-btn--sm"
+            @tap="openRefund(order)"
+          >
+            <text>申请退款</text>
+          </view>
+        </view>
+
+        <!-- 退款原因内联填写：驳回后需要理由，买家申请同理 -->
+        <view v-if="refundFor === order.order_id" class="order__form">
+          <textarea
+            v-model="refundReason"
+            class="g-input order__textarea"
+            maxlength="200"
+            placeholder="说明退款原因，例如：与描述不符 / 卖家超时未发货"
+            placeholder-class="g-placeholder"
+          />
+          <view class="g-row order__form-actions">
+            <view class="g-btn g-btn--ghost g-btn--sm" @tap="refundFor = 0"><text>取消</text></view>
+            <view class="g-btn g-btn--primary g-btn--sm" @tap="submitRefund(order)"><text>提交申请</text></view>
+          </view>
         </view>
 
         <!-- 发货内联表单：不用弹窗，避免小程序端弹窗里再套输入框的层级问题 -->
@@ -125,7 +147,7 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
-import { reviewOrder, cancelOrder, confirmOrder, listOrders, payOrder, shipOrder, simulatePayment } from '../../api/trade'
+import { applyRefund, reviewOrder, cancelOrder, confirmOrder, listOrders, payOrder, shipOrder, simulatePayment } from '../../api/trade'
 import { isLoggedIn } from '../../store/session'
 import { money, orderStatus, relativeTime } from '../../utils/format'
 import { confirmModal, toast } from '../../utils/ui'
@@ -135,6 +157,8 @@ const orders = ref([])
 const loading = ref(false)
 const shipFor = ref(0)
 const reviewFor = ref(0)
+const refundFor = ref(0)
+const refundReason = ref('')
 const shipForm = reactive({ company: '', tracking: '' })
 const reviewForm = reactive({ rating: 5, content: '' })
 
@@ -262,6 +286,36 @@ function openReview(order) {
   reviewFor.value = order.order_id
   reviewForm.rating = 5
   reviewForm.content = ''
+}
+
+/**
+ * 只有「钱还在平台冻结」的阶段可申请退款（paid / seller_shipped）。
+ * completed 之后资金已结算给卖家，必须走人工售后，所以这里不显示按钮。
+ */
+function canRefund(order) {
+  return role.value === 'buyer' && ['paid', 'seller_shipped'].includes(order.status)
+}
+
+function openRefund(order) {
+  refundFor.value = order.order_id
+  refundReason.value = ''
+}
+
+async function submitRefund(order) {
+  const reason = refundReason.value.trim()
+  if (reason.length < 2) {
+    toast('请填写退款原因')
+    return
+  }
+
+  try {
+    await applyRefund(order.order_id, reason)
+    refundFor.value = 0
+    toast('已提交，等待平台审核')
+    load()
+  } catch (e) {
+    /* request 层已提示（已有处理中的退款等） */
+  }
 }
 
 async function submitReview(order) {
@@ -407,6 +461,12 @@ onPullDownRefresh(async () => {
 .order__form-actions {
   justify-content: flex-end;
   gap: 16rpx;
+}
+
+.order__textarea {
+  height: 160rpx;
+  padding: 20rpx 28rpx;
+  line-height: 1.5;
 }
 
 .order__stars {

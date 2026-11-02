@@ -64,3 +64,14 @@ export function simulatePayment(paymentId) {
 export function reviewOrder(orderId, { rating, content }) {
   return http.post(`/orders/${orderId}/reviews`, { rating, content })
 }
+
+/* ---------- 售后 ---------- */
+
+/** 申请退款：只落申请单，钱由后台审核通过才退（买家侧不存在「点一下钱就没了」） */
+export function applyRefund(orderId, reason) {
+  return http.post(`/orders/${orderId}/refunds`, { reason })
+}
+
+export function listRefunds(params = {}) {
+  return http.get('/me/refunds', { data: params, silent: true })
+}

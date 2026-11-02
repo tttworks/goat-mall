@@ -43,9 +43,42 @@
         <text class="entry__label">我卖出的</text>
         <text class="entry__arrow">›</text>
       </view>
+      <view class="entry" @tap="go('/pages/cart/index')">
+        <text class="entry__icon">▤</text>
+        <text class="entry__label">购物车</text>
+        <text class="entry__arrow">›</text>
+      </view>
       <view class="entry" @tap="go('/pages/me/favorites')">
         <text class="entry__icon">★</text>
         <text class="entry__label">我的收藏</text>
+        <text class="entry__arrow">›</text>
+      </view>
+      <view class="entry" @tap="go('/pages/me/refunds')">
+        <text class="entry__icon">↺</text>
+        <text class="entry__label">退款/售后</text>
+        <text class="entry__arrow">›</text>
+      </view>
+    </view>
+
+    <view class="g-card entries">
+      <view class="entry" @tap="goSeller">
+        <text class="entry__icon">⚑</text>
+        <text class="entry__label">卖家中心</text>
+        <text class="entry__arrow">›</text>
+      </view>
+      <view class="entry" @tap="go('/pages/identity/index')">
+        <text class="entry__icon">☑</text>
+        <text class="entry__label">实名认证</text>
+        <text class="entry__arrow">›</text>
+      </view>
+      <view class="entry" @tap="goAuctions">
+        <text class="entry__icon">⏱</text>
+        <text class="entry__label">竞拍专场</text>
+        <text class="entry__arrow">›</text>
+      </view>
+      <view class="entry" @tap="go('/pages/im/index')">
+        <text class="entry__icon">✎</text>
+        <text class="entry__label">私信</text>
         <text class="entry__arrow">›</text>
       </view>
       <view class="entry" @tap="go('/pages/me/notifications')">
@@ -89,6 +122,16 @@ function go(url) {
 
 function goLogin() {
   uni.navigateTo({ url: '/pages/login/index' })
+}
+
+function goSeller() {
+  if (!requireAuth()) return
+  uni.navigateTo({ url: '/pages/seller/index' })
+}
+
+/** 竞拍是浏览型页面，未登录也能看，登录只在出价时才要求 */
+function goAuctions() {
+  uni.navigateTo({ url: '/pages/auction/index' })
 }
 
 function requireAuth() {

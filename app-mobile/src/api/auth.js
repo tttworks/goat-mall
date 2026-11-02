@@ -9,6 +9,9 @@ import { http } from './request'
 
 /**
  * 认证域。device_name 固定带上平台号，后台「登录设备」列表才分得清是谁在登。
+ *
+ * 路径必须与 routes/api.php 的 auth 分组一致（/auth/login 等）：
+ * 少写一层前缀会 404，登录页就变成「点了没反应」的空白页。
  */
 function deviceName() {
   let platform = 'h5'
@@ -23,21 +26,21 @@ function deviceName() {
 }
 
 export function login({ login, password }) {
-  return http.post('/login', { login, password, device_name: deviceName() }, { auth: false })
+  return http.post('/auth/login', { login, password, device_name: deviceName() }, { auth: false })
 }
 
 export function register({ username, password, password_confirmation, nickname }) {
   return http.post(
-    '/register',
+    '/auth/register',
     { username, password, password_confirmation, nickname, locale: 'zh_CN' },
     { auth: false }
   )
 }
 
 export function fetchMe(options = {}) {
-  return http.get('/me', options)
+  return http.get('/auth/me', options)
 }
 
 export function logout() {
-  return http.post('/logout', {}, { silent: true })
+  return http.post('/auth/logout', {}, { silent: true })
 }

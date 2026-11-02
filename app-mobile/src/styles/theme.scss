@@ -179,6 +179,11 @@
   color: $goat-accent;
 }
 
+.g-tag--danger {
+  background-color: rgba(255, 90, 90, 0.14);
+  color: $goat-danger;
+}
+
 /* ---------- 空态 / 加载 ---------- */
 .g-empty {
   padding: 120rpx 0;

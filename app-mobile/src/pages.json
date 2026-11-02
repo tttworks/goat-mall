@@ -40,6 +40,13 @@
       }
     },
     {
+      "path": "pages/im/index",
+      "style": {
+        "navigationBarTitleText": "私信",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
       "path": "pages/im/chat",
       "style": {
         "navigationBarTitleText": "私信"
@@ -64,6 +71,82 @@
       "style": {
         "navigationBarTitleText": "我的收藏",
         "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/me/refunds",
+      "style": {
+        "navigationBarTitleText": "退款/售后",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/search/index",
+      "style": {
+        "navigationBarTitleText": "搜索"
+      }
+    },
+    {
+      "path": "pages/cart/index",
+      "style": {
+        "navigationBarTitleText": "购物车",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/auction/index",
+      "style": {
+        "navigationBarTitleText": "竞拍专场",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/auction/detail",
+      "style": {
+        "navigationBarTitleText": "拍品详情"
+      }
+    },
+    {
+      "path": "pages/figure/market",
+      "style": {
+        "navigationBarTitleText": "行情"
+      }
+    },
+    {
+      "path": "pages/seller/index",
+      "style": {
+        "navigationBarTitleText": "卖家中心"
+      }
+    },
+    {
+      "path": "pages/seller/listings",
+      "style": {
+        "navigationBarTitleText": "我的商品",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/seller/edit",
+      "style": {
+        "navigationBarTitleText": "发布商品"
+      }
+    },
+    {
+      "path": "pages/seller/shop",
+      "style": {
+        "navigationBarTitleText": "店铺"
+      }
+    },
+    {
+      "path": "pages/seller/reviews",
+      "style": {
+        "navigationBarTitleText": "店铺评价"
+      }
+    },
+    {
+      "path": "pages/identity/index",
+      "style": {
+        "navigationBarTitleText": "实名认证"
       }
     }
   ],

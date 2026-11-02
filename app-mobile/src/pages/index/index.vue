@@ -8,18 +8,29 @@
 <template>
   <view class="feed">
     <view class="feed__head">
-      <view class="feed__search">
+      <!-- 搜索统一走独立搜索页：首页内联搜索只能搜图鑑，搜不到在售商品 -->
+      <view class="feed__search" @tap="goSearch">
         <text class="feed__search-icon">⌕</text>
-        <input
-          v-model="keyword"
-          class="feed__search-input"
-          placeholder="搜图鑑 / 厂牌 / 系列"
-          placeholder-class="g-placeholder"
-          confirm-type="search"
-          @confirm="reload"
-        />
-        <view v-if="keyword" class="feed__search-clear" @tap="clearKeyword">
-          <text>×</text>
+        <text class="feed__search-placeholder">搜图鑑 / 商品 / 系列</text>
+        <text class="feed__search-go">搜索</text>
+      </view>
+
+      <view class="shortcuts">
+        <view class="shortcut" @tap="goAuctions">
+          <text class="shortcut__icon">⏱</text>
+          <text class="shortcut__label">竞拍</text>
+        </view>
+        <view class="shortcut" @tap="goCart">
+          <text class="shortcut__icon">▤</text>
+          <text class="shortcut__label">购物车</text>
+        </view>
+        <view class="shortcut" @tap="goSeller">
+          <text class="shortcut__icon">⚑</text>
+          <text class="shortcut__label">卖家中心</text>
+        </view>
+        <view class="shortcut" @tap="goMine">
+          <text class="shortcut__icon">◉</text>
+          <text class="shortcut__label">我的</text>
         </view>
       </view>
     </view>
@@ -81,7 +92,7 @@
     </view>
 
     <view v-else-if="!loading" class="g-empty">
-      <text>{{ keyword ? '没有匹配的图鑑，换个词试试' : '图鑑库正在入库，稍后再来看看' }}</text>
+      <text>{{ category ? '该品类下暂时没有图鑑，换个品类看看' : '图鑑库正在入库，稍后再来看看' }}</text>
     </view>
 
     <view v-if="loading" class="g-loading">
@@ -95,13 +106,13 @@
 
 <script setup>
 import { ref } from 'vue'
-import { onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
+import { onLoad, onPullDownRefresh, onReachBottom, onUnload } from '@dcloudio/uni-app'
 import { listFigures } from '../../api/catalog'
+import { isLoggedIn } from '../../store/session'
 import { money } from '../../utils/format'
 
 const figures = ref([])
 const categories = ref([])
-const keyword = ref('')
 const category = ref('')
 const page = ref(1)
 const hasMore = ref(true)
@@ -121,7 +132,6 @@ async function load(reset = false) {
   loading.value = true
   try {
     const params = { page: reset ? 1 : page.value, per_page: 20 }
-    if (keyword.value.trim()) params.keyword = keyword.value.trim()
     if (category.value) params.category = category.value
 
     const payload = await listFigures(params)
@@ -147,8 +157,40 @@ function reload() {
   load(true)
 }
 
-function clearKeyword() {
-  keyword.value = ''
+function goSearch() {
+  uni.navigateTo({ url: '/pages/search/index' })
+}
+
+function goAuctions() {
+  uni.navigateTo({ url: '/pages/auction/index' })
+}
+
+/** 购物车与卖家中心都需要登录态，未登录直接送去登录页，避免进去一片空 */
+function goWithAuth(url) {
+  if (!isLoggedIn()) {
+    uni.navigateTo({ url: '/pages/login/index' })
+    return
+  }
+
+  uni.navigateTo({ url })
+}
+
+function goCart() {
+  goWithAuth('/pages/cart/index')
+}
+
+function goSeller() {
+  goWithAuth('/pages/seller/index')
+}
+
+function goMine() {
+  uni.switchTab({ url: '/pages/me/index' })
+}
+
+/** 搜索页选品类后回传：等价于首页点品类 chip，不用重开一页 */
+function onPickCategory(value) {
+  if (typeof value !== 'string' || category.value === value) return
+  category.value = value
   reload()
 }
 
@@ -162,6 +204,11 @@ function openFigure(figure) {
   uni.navigateTo({ url: `/pages/figure/detail?id=${figure.figure_id}` })
 }
 
+onLoad(() => {
+  uni.$on('goat:pick-category', onPickCategory)
+  load(true)
+})
+
 onPullDownRefresh(async () => {
   await load(true)
   uni.stopPullDownRefresh()
@@ -169,7 +216,9 @@ onPullDownRefresh(async () => {
 
 onReachBottom(() => load(false))
 
-load(true)
+onUnload(() => {
+  uni.$off('goat:pick-category', onPickCategory)
+})
 </script>
 
 <style lang="scss" scoped>
@@ -198,16 +247,45 @@ load(true)
   font-size: 32rpx;
 }
 
-.feed__search-input {
+.feed__search-placeholder {
   flex: 1;
-  color: $goat-text;
+  color: $goat-text-dim;
   font-size: 28rpx;
 }
 
-.feed__search-clear {
-  padding: 0 8rpx;
-  color: $goat-text-dim;
-  font-size: 34rpx;
+.feed__search-go {
+  color: $goat-accent;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.shortcuts {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.shortcut {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 18rpx 0;
+  border-radius: $goat-radius-sm;
+  background-color: $goat-surface;
+  border: 1rpx solid $goat-border;
+}
+
+.shortcut__icon {
+  color: $goat-accent;
+  font-size: 30rpx;
+}
+
+.shortcut__label {
+  color: $goat-text-muted;
+  font-size: 22rpx;
 }
 
 .feed__chips {

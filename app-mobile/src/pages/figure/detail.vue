@@ -61,6 +61,33 @@
       </view>
     </view>
 
+    <!-- 行情入口：即便没有成交也要出现，否则「行情」这个能力在 C 端等于不存在 -->
+    <view class="g-card detail__section quote" @tap="openMarket">
+      <view class="g-row--between">
+        <text class="g-title">行情走势</text>
+        <text class="g-dim">近 30 天 ›</text>
+      </view>
+
+      <view class="quote__body">
+        <view class="quote__col">
+          <text class="quote__value">
+            {{ headline.median ? `¥${money(headline.median)}` : '暂无成交' }}
+          </text>
+          <text class="g-dim">成交中位数</text>
+        </view>
+        <view class="quote__col">
+          <text class="quote__value">{{ headline.sample || '—' }}</text>
+          <text class="g-dim">站内样本</text>
+        </view>
+        <view class="quote__col">
+          <text class="quote__value">
+            {{ headline.low ? `¥${money(headline.low)}` : '—' }}
+          </text>
+          <text class="g-dim">区间低点</text>
+        </view>
+      </view>
+    </view>
+
     <view v-if="specRows.length" class="g-card detail__section">
       <text class="g-title detail__section-title">规格</text>
       <view v-for="row in specRows" :key="row.key" class="detail__spec">
@@ -115,7 +142,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getFigure } from '../../api/catalog'
+import { getFigure, getFigureQuotes } from '../../api/catalog'
 import { addFavorite, listFavorites, removeFavorite } from '../../api/social'
 import { requireLogin } from '../../store/session'
 import { conditionLabel, money } from '../../utils/format'
@@ -124,6 +151,9 @@ import { toast } from '../../utils/ui'
 const figure = ref(null)
 const loading = ref(false)
 const favorited = ref(false)
+const quotes = ref(null)
+
+const headline = computed(() => quotes.value?.headline || { available: false })
 
 const gallery = computed(() => {
   if (!figure.value) return []
@@ -154,6 +184,14 @@ async function loadFigure(id) {
     figure.value = payload.data
     uni.setNavigationBarTitle({ title: payload.data?.name || '图鑑详情' })
     syncFavoriteState()
+    // 行情是附加信息：失败不影响主详情，静默降级为「暂无成交」
+    getFigureQuotes(id, { days: 30 })
+      .then((result) => {
+        quotes.value = result?.data || null
+      })
+      .catch(() => {
+        quotes.value = null
+      })
   } catch (e) {
     toast('图鑑不存在或已下架')
   } finally {
@@ -203,6 +241,10 @@ async function toggleFavorite() {
 
 function openListing(item) {
   uni.navigateTo({ url: `/pages/listing/detail?id=${item.listing_id}` })
+}
+
+function openMarket() {
+  uni.navigateTo({ url: `/pages/figure/market?id=${figure.value.figure_id}` })
 }
 
 onLoad((options) => {
@@ -301,6 +343,30 @@ onLoad((options) => {
 
 .detail__section {
   margin: 24rpx 24rpx 0;
+}
+
+.quote {
+  padding: 24rpx;
+}
+
+.quote__body {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.quote__col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.quote__value {
+  color: $goat-accent;
+  font-size: 30rpx;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .detail__section-head {

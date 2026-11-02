@@ -36,9 +36,9 @@
       </view>
 
       <view class="g-card detail__seller">
-        <view class="g-flex-1">
-          <text class="detail__seller-title">卖家 #{{ listing.seller_id }}</text>
-          <text class="g-dim">平台担保交易 · 收货确认后结算</text>
+        <view class="g-flex-1" @tap="openShop">
+          <text class="detail__seller-title">{{ shopName }} ›</text>
+          <text class="g-dim">{{ sellerSubtitle }}</text>
         </view>
         <view class="g-btn g-btn--sm" @tap="followSellerAction">
           <text>{{ following ? '已关注' : '关注' }}</text>
@@ -59,6 +59,10 @@
         <text>✉</text>
         <text class="g-dim">私信</text>
       </view>
+      <view class="detail__bar-icon" @tap="addCart">
+        <text>▤</text>
+        <text class="g-dim">加购</text>
+      </view>
       <view
         class="g-btn g-btn--primary detail__buy"
         :class="{ 'g-btn--disabled': submitting }"
@@ -78,8 +82,7 @@
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getListing } from '../../api/catalog'
-import { addFavorite, followSeller, listFavorites, removeFavorite } from '../../api/social'
-import { openConversation } from '../../api/social'
+import { addFavorite, addToCart, followSeller, listFavorites, openConversation, removeFavorite } from '../../api/social'
 import { createOrder, payOrder, simulatePayment } from '../../api/trade'
 import { isLoggedIn, requireLogin } from '../../store/session'
 import { conditionLabel, money } from '../../utils/format'
@@ -101,6 +104,20 @@ const gallery = computed(() => {
 })
 
 const purchasable = computed(() => listing.value?.status === 'active' && listing.value?.stock > 0)
+
+// 没开店档案时回落到卖家 id：旧数据（店铺页未上线前上架）也要能显示，不能是空白标题
+const shopName = computed(() => listing.value?.seller?.shop_name || `卖家 #${listing.value?.seller_id ?? ''}`)
+
+const sellerSubtitle = computed(() => {
+  const seller = listing.value?.seller
+  const parts = []
+
+  if (seller?.rating) parts.push(`${Number(seller.rating).toFixed(1)} 分`)
+  if (seller?.sold_count) parts.push(`已售 ${seller.sold_count} 件`)
+  parts.push('平台担保交易')
+
+  return parts.join(' · ')
+})
 
 async function load(id) {
   loading.value = true
@@ -225,6 +242,27 @@ async function buy() {
   } finally {
     submitting.value = false
   }
+}
+
+/** 加购不需要校验可购状态：后端会拒绝非在售商品，前端多拦一层只会让提示错位 */
+async function addCart() {
+  if (!requireLogin()) return
+
+  try {
+    await addToCart(listing.value.listing_id)
+    const go = await confirmModal({
+      title: '已加入购物车',
+      content: '要去购物车看看吗？',
+      confirmText: '去购物车'
+    })
+    if (go) uni.navigateTo({ url: '/pages/cart/index' })
+  } catch (e) {
+    /* request 层已提示（已下架/已加购等） */
+  }
+}
+
+function openShop() {
+  uni.navigateTo({ url: `/pages/seller/shop?id=${listing.value.seller_id}` })
 }
 
 function openFigure() {
