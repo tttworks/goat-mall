@@ -11,15 +11,18 @@
  * 追加时用独立 Route::prefix() 分组，避免与其他 agent 改同一行。
  */
 
+use App\Http\Controllers\Api\Admin\FigureController as AdminFigureController;
+use App\Http\Controllers\Api\Admin\ListingController as AdminListingController;
+use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Api\AuctionController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\FigureController;
 use App\Http\Controllers\Api\IdentityController;
 use App\Http\Controllers\Api\ListingController;
-use App\Http\Controllers\Api\Admin\FigureController as AdminFigureController;
-use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
-use App\Http\Controllers\Api\FigureController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\SellerAuctionController;
 use App\Http\Controllers\Api\SellerController;
+use App\Http\Controllers\Api\SellerListingController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->name('api.v1.')->group(function () {
@@ -100,12 +103,47 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // 交易 + 出价（需登录；认证提供方 = T2）
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
+        Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/{order}', [OrderController::class, 'show'])
             ->whereNumber('order')->name('orders.show');
         Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])
             ->whereNumber('order')->name('orders.cancel');
 
+        // 卖家发货 / 买家确认收货：角色由服务层按 buyer_id / seller_id 判定
+        Route::post('/orders/{order}/ship', [OrderController::class, 'ship'])
+            ->whereNumber('order')->name('orders.ship');
+        Route::post('/orders/{order}/confirm', [OrderController::class, 'confirm'])
+            ->whereNumber('order')->name('orders.confirm');
+
         Route::post('/auctions/{auction}/bids', [AuctionController::class, 'bid'])
             ->whereNumber('auction')->name('auctions.bid');
+    });
+
+    // ---------------- 卖家经营（T4）----------------
+    Route::middleware(['auth:sanctum', 'seller'])->prefix('seller')->name('seller.')->group(function () {
+        Route::get('/listings', [SellerListingController::class, 'index'])->name('listings.index');
+        Route::post('/listings', [SellerListingController::class, 'store'])->name('listings.store');
+        Route::put('/listings/{listing}', [SellerListingController::class, 'update'])
+            ->whereNumber('listing')->name('listings.update');
+
+        // 状态流转独立成动作路由：一次请求只做一件事，避免「编辑 + 上架」混在一个 PUT 里
+        Route::post('/listings/{listing}/submit', [SellerListingController::class, 'submit'])
+            ->whereNumber('listing')->name('listings.submit');
+        Route::post('/listings/{listing}/delist', [SellerListingController::class, 'delist'])
+            ->whereNumber('listing')->name('listings.delist');
+        Route::post('/listings/{listing}/reopen', [SellerListingController::class, 'reopen'])
+            ->whereNumber('listing')->name('listings.reopen');
+
+        Route::post('/listings/{listing}/auctions', [SellerAuctionController::class, 'store'])
+            ->whereNumber('listing')->name('auctions.store');
+        Route::post('/auctions/{auction}/cancel', [SellerAuctionController::class, 'cancel'])
+            ->whereNumber('auction')->name('auctions.cancel');
+    });
+
+    // 商品审核（T4，仅 admin）
+    Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/listings', [AdminListingController::class, 'index'])->name('listings.index');
+        Route::post('/listings/{listing}/review', [AdminListingController::class, 'review'])
+            ->whereNumber('listing')->name('listings.review');
     });
 });

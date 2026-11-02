@@ -14,6 +14,7 @@ use App\Services\Trade\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Validation\Rule;
 
 /**
  * 下单 / 取消（T4）。买家身份取自登录态（认证由 T2 提供，此处不重复实现）。
@@ -82,6 +83,61 @@ class OrderController extends Controller
         return response()->json(['data' => $this->payload($this->orders->cancel($order, $reason))]);
     }
 
+    /** 我的订单：as=buyer 买到的，as=seller 卖出的（同一张表两个视角，不建两套接口） */
+    public function index(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'as' => ['nullable', Rule::in(['buyer', 'seller'])],
+            'status' => ['nullable', 'string', 'max:24'],
+            'per_page' => ['nullable', 'integer', 'between:1,50'],
+        ]);
+
+        $userId = (int) $request->user()->user_id;
+        $column = ($validated['as'] ?? 'buyer') === 'seller' ? 'seller_id' : 'buyer_id';
+
+        $page = Order::query()
+            ->with('items')
+            ->where($column, $userId)
+            ->when($validated['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->orderByDesc('order_id')
+            ->paginate((int) ($validated['per_page'] ?? 20));
+
+        return response()->json([
+            'data' => collect($page->items())->map(fn (Order $order) => $this->payload($order, true))->all(),
+            'meta' => [
+                'total' => $page->total(),
+                'page' => $page->currentPage(),
+                'per_page' => $page->perPage(),
+            ],
+        ]);
+    }
+
+    /** 卖家发货：运单号必填，买家据此查件 */
+    public function ship(Request $request, int $orderId): JsonResponse
+    {
+        $validated = $request->validate([
+            'shipping_company' => ['required', 'string', 'max:32'],
+            'tracking_no' => ['required', 'string', 'max:64'],
+        ]);
+
+        $order = $this->orders->ship(
+            (int) $request->user()->user_id,
+            $orderId,
+            $validated['shipping_company'],
+            $validated['tracking_no']
+        );
+
+        return response()->json(['data' => $this->payload($order, true)]);
+    }
+
+    /** 买家确认收货：触发担保资金解冻（seller_shipped → buyer_confirmed → completed） */
+    public function confirm(Request $request, int $orderId): JsonResponse
+    {
+        $order = $this->orders->confirmReceipt((int) $request->user()->user_id, $orderId);
+
+        return response()->json(['data' => $this->payload($order, true)]);
+    }
+
     /** @return array<string, mixed> */
     private function payload(Order $order, bool $detail = false): array
     {
@@ -103,6 +159,10 @@ class OrderController extends Controller
         if ($detail) {
             $data['seller_id'] = $order->seller_id;
             $data['fee_bearer'] = $order->fee_bearer;
+            // 发货信息：买家查件全靠这两个字段，列表页就不必再单开接口
+            $data['shipping_company'] = $order->shipping_company;
+            $data['tracking_no'] = $order->tracking_no;
+            $data['shipped_at'] = $order->shipped_at?->toIso8601String();
             $data['items'] = $order->items->map(fn ($item) => [
                 'order_item_id' => $item->order_item_id,
                 'listing_id' => $item->listing_id,

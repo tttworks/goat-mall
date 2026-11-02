@@ -10,6 +10,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\ListingStatus;
+use App\Http\Resources\ListingResource;
 use App\Models\Listing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,7 +69,7 @@ class ListingController extends Controller
         $page = $query->paginate((int) ($validated['per_page'] ?? 20));
 
         return response()->json([
-            'data' => collect($page->items())->map(fn (Listing $listing) => $this->payload($listing)),
+            'data' => ListingResource::collection($page->items()),
             'meta' => [
                 'current_page' => $page->currentPage(),
                 'per_page' => $page->perPage(),
@@ -84,32 +85,6 @@ class ListingController extends Controller
             ->whereKey($listingId)
             ->firstOrFail();
 
-        return response()->json(['data' => $this->payload($listing, true)]);
-    }
-
-    /** @return array<string, mixed> */
-    private function payload(Listing $listing, bool $detail = false): array
-    {
-        $data = [
-            'listing_id' => $listing->listing_id,
-            'title' => $listing->title,
-            'price' => (string) $listing->price,
-            'currency' => $listing->currency,
-            'condition' => $listing->condition_enum,
-            'status' => $listing->status->value,
-            'stock' => $listing->stock,
-            'cover_url' => $listing->coverUrl(),
-            'figure_id' => $listing->figure_id,
-            'seller_id' => $listing->seller_id,
-            'published_at' => $listing->published_at?->toIso8601String(),
-        ];
-
-        if ($detail) {
-            $data['description'] = $listing->description;
-            $data['gallery_urls'] = $listing->galleryUrls();
-            $data['figure'] = $listing->figure?->only(['figure_id', 'name', 'series', 'maker', 'scale']);
-        }
-
-        return $data;
+        return response()->json(['data' => ListingResource::make($listing, true)]);
     }
 }

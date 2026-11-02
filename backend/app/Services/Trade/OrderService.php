@@ -165,6 +165,63 @@ class OrderService
         }, 3);
     }
 
+    /**
+     * 卖家发货（paid → seller_shipped）。
+     *
+     * 只认订单里的 seller_id，不信任入参里的任何卖家标识；
+     * 运单号落库后买家侧即可查件，无需再跳外部系统。
+     */
+    public function ship(int $sellerId, int $orderId, string $company, string $trackingNo): Order
+    {
+        return DB::transaction(function () use ($sellerId, $orderId, $company, $trackingNo) {
+            /** @var Order $order */
+            $order = Order::query()->whereKey($orderId)->lockForUpdate()->firstOrFail();
+
+            if ((int) $order->seller_id !== $sellerId) {
+                throw new TradeException('无权操作他人的订单');
+            }
+
+            if ($order->status !== OrderStatus::Paid) {
+                throw new TradeException('只有已付款订单可以发货');
+            }
+
+            $order->transitTo(OrderStatus::SellerShipped, [
+                'shipping_company' => $company,
+                'tracking_no' => $trackingNo,
+                'shipped_at' => Carbon::now(),
+            ]);
+
+            return $order->refresh();
+        }, 3);
+    }
+
+    /**
+     * 买家确认收货（seller_shipped → buyer_confirmed → completed），担保资金解冻。
+     *
+     * 分两步走而不是直接置 completed：状态机里 completed 只能由 buyer_confirmed 进入，
+     * 直跳会让「确认收货时间」与「资金释放」两个事实失去单据依据。
+     */
+    public function confirmReceipt(int $buyerId, int $orderId): Order
+    {
+        return DB::transaction(function () use ($buyerId, $orderId) {
+            /** @var Order $order */
+            $order = Order::query()->whereKey($orderId)->lockForUpdate()->firstOrFail();
+
+            if ((int) $order->buyer_id !== $buyerId) {
+                throw new TradeException('无权操作他人的订单');
+            }
+
+            if ($order->status !== OrderStatus::SellerShipped) {
+                throw new TradeException('只有已发货订单可以确认收货');
+            }
+
+            $order->transitTo(OrderStatus::BuyerConfirmed, ['confirmed_at' => Carbon::now()]);
+            $order->transitTo(OrderStatus::Completed, ['escrow_status' => 'released']);
+
+            return $order->refresh();
+        }, 3);
+    }
+
     /** 释放到期未付款订单（调度调用；逐单加锁，单笔失败不影响批次） */
     public function closeExpired(int $limit = 100): int
     {

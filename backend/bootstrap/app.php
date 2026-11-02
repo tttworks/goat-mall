@@ -31,8 +31,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // 角色守卫（T2）：路由里写 ->middleware('role:admin')
+        // 卖家守卫（T4）：店铺 active + 实名 approved，与角色是两套口径，不能合并
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureRole::class,
+            'seller' => \App\Http\Middleware\EnsureSeller::class,
         ]);
 
         // 反代/Octane 场景下取真实 IP（WAF 与风控依赖）
