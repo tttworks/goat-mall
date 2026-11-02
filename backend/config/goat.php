@@ -123,6 +123,33 @@ return [
 
     ],
 
+    // 社群 UGC（T6）：帖子审核口径
+    'community' => [
+        // 机审通过后是否直接发布；false = 全部转人工（灰度期建议 false，先攒人工样本）
+        'auto_publish_on_pass' => (bool) env('GOAT_COMMUNITY_AUTO_PUBLISH', true),
+        'post_max_images' => (int) env('GOAT_COMMUNITY_POST_MAX_IMAGES', 9),
+        'post_max_length' => (int) env('GOAT_COMMUNITY_POST_MAX_LENGTH', 1000),
+    ],
+
+    // 内容机审通道（T6）：keyword（零采购默认，词表走环境变量）/ http（云厂商，填 base_url + key）
+    // 词表不进代码：它属于运营策略，随时会变
+    'moderation' => [
+        'driver' => env('GOAT_MODERATION_DRIVER', 'keyword'),
+        'keywords' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('GOAT_MODERATION_KEYWORDS', ''))
+        ))),
+        'base_url' => env('GOAT_MODERATION_BASE_URL', ''),
+        'key' => env('GOAT_MODERATION_KEY', ''),
+        'timeout' => (int) env('GOAT_MODERATION_TIMEOUT', 5),
+    ],
+
+    // 私信（T6）：本轮为 HTTP 拉取，实时推送（WS）留后续，表结构已按增量拉取设计
+    'im' => [
+        'max_length' => (int) env('GOAT_IM_MAX_LENGTH', 1000),
+        'ws_enabled' => (bool) env('GOAT_IM_WS_ENABLED', false),
+    ],
+
     // 采集系统内部 API（契约 §4；HMAC 密钥只存服务器环境）
     'collector' => [
         'base_url' => env('COLLECTOR_BASE_URL', ''),

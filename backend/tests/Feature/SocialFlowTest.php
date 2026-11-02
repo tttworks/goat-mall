@@ -263,6 +263,53 @@ class SocialFlowTest extends TestCase
             ->assertJsonPath('summary.average', 4);
     }
 
+    public function test_cart_only_accepts_purchasable_listings_and_is_idempotent(): void
+    {
+        $seller = $this->makeSeller();
+        $buyer = $this->makeUser('cart_buyer');
+        $listing = $this->makeListing($seller);
+
+        Sanctum::actingAs($buyer);
+
+        $this->postJson('/api/v1/me/cart', ['listing_id' => $listing->listing_id])
+            ->assertCreated()
+            ->assertJsonPath('data.listing_id', (int) $listing->listing_id);
+
+        // 重复加购幂等，不累加数量
+        $this->postJson('/api/v1/me/cart', ['listing_id' => $listing->listing_id])->assertOk();
+        $this->assertSame(1, \App\Models\CartItem::query()->count());
+
+        $this->getJson('/api/v1/me/cart')
+            ->assertOk()
+            ->assertJsonPath('data.0.purchasable', true)
+            ->assertJsonPath('data.0.listing.price', '1280.00');
+
+        // 卖家下架后购物车行保留但置灰，不能直接下单
+        Listing::query()->whereKey($listing->listing_id)->update(['status' => 'delisted']);
+
+        $this->getJson('/api/v1/me/cart')
+            ->assertOk()
+            ->assertJsonPath('data.0.purchasable', false);
+
+        // 已下架的商品不能再加购（已在车内的行不受影响）
+        $this->postJson('/api/v1/me/cart', ['listing_id' => $listing->listing_id])->assertStatus(422);
+
+        // 卖家不能把自己商品加购（用另一张在售商品验证）
+        $other = $this->makeListing($seller);
+        Sanctum::actingAs($seller);
+        $this->postJson('/api/v1/me/cart', ['listing_id' => $other->listing_id])->assertStatus(422);
+        $this->postJson('/api/v1/me/cart', ['listing_id' => 999999])->assertStatus(404);
+
+        // 删除 + 清空
+        Sanctum::actingAs($buyer);
+        $this->deleteJson("/api/v1/me/cart/{$listing->listing_id}")
+            ->assertOk()
+            ->assertJsonPath('data.removed', true);
+
+        $this->deleteJson('/api/v1/me/cart')->assertOk();
+        $this->assertSame(0, \App\Models\CartItem::query()->count());
+    }
+
     public function test_notification_read_flow_and_dedupe(): void
     {
         $seller = $this->makeSeller();

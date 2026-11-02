@@ -14,6 +14,9 @@ use App\Services\Auth\WechatClient;
 use App\Services\Identity\Contracts\IdentityVerifier;
 use App\Services\Identity\Drivers\HttpVerifier;
 use App\Services\Identity\Drivers\NullVerifier;
+use App\Services\Moderation\Contracts\ModerationChannel;
+use App\Services\Moderation\Drivers\HttpChannel;
+use App\Services\Moderation\Drivers\KeywordChannel;
 use App\Services\Payment\Contracts\PaymentChannel;
 use App\Services\Payment\Drivers\SandboxChannel;
 use App\Services\Payment\PaymentService;
@@ -59,6 +62,20 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(PaymentService::class);
+
+        // 内容机审通道（T6）：keyword 零采购可用，http 接云厂商；换驱动不改 PostService
+        $this->app->bind(ModerationChannel::class, function (): ModerationChannel {
+            $config = (array) config('goat.moderation', []);
+
+            return match ((string) ($config['driver'] ?? 'keyword')) {
+                'http' => new HttpChannel(
+                    (string) ($config['base_url'] ?? ''),
+                    (string) ($config['key'] ?? ''),
+                    (int) ($config['timeout'] ?? 5),
+                ),
+                default => new KeywordChannel((array) ($config['keywords'] ?? [])),
+            };
+        });
     }
 
     public function boot(): void

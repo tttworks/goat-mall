@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 竞拍场次创建 / 取消（T4 写侧；出价与结算在 BiddingService）。
@@ -137,7 +138,7 @@ class AuctionService
 
             if ($reason !== null && $reason !== '') {
                 // 撤销原因落审计日志，便于客服举证（不改表结构）
-                logger()->channel('goat.trade')->info('auction.cancelled', [
+                Log::channel('goat.trade')->info('auction.cancelled', [
                     'auction_id' => $auction->auction_id,
                     'seller_id' => $auction->seller_id,
                     'reason' => mb_substr($reason, 0, 255),

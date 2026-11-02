@@ -14,16 +14,21 @@
 use App\Http\Controllers\Api\Admin\FigureController as AdminFigureController;
 use App\Http\Controllers\Api\Admin\ListingController as AdminListingController;
 use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
+use App\Http\Controllers\Api\Admin\PostController as AdminPostController;
 use App\Http\Controllers\Api\AuctionController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\FigureController;
 use App\Http\Controllers\Api\FollowController;
 use App\Http\Controllers\Api\IdentityController;
 use App\Http\Controllers\Api\ListingController;
+use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PostController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\SellerAuctionController;
 use App\Http\Controllers\Api\SellerController;
@@ -172,6 +177,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::delete('/me/favorites/{targetType}/{targetId}', [FavoriteController::class, 'destroy'])
             ->where('targetType', 'listing|figure')->whereNumber('targetId')->name('favorites.destroy');
 
+        // 购物车：加购不锁库，锁库只在下单事务里做
+        Route::get('/me/cart', [CartController::class, 'index'])->name('cart.index');
+        Route::post('/me/cart', [CartController::class, 'store'])->name('cart.store');
+        Route::delete('/me/cart', [CartController::class, 'clear'])->name('cart.clear');
+        Route::delete('/me/cart/{listing}', [CartController::class, 'destroy'])
+            ->whereNumber('listing')->name('cart.destroy');
+
         Route::get('/me/follows', [FollowController::class, 'index'])->name('follows.index');
         Route::post('/sellers/{seller}/follow', [FollowController::class, 'store'])
             ->whereNumber('seller')->name('follows.store');
@@ -194,4 +206,32 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // 店铺评价墙（公开）：未登录可看，登录后附带「是否已关注」
     Route::get('/sellers/{seller}/reviews', [ReviewController::class, 'sellerIndex'])
         ->whereNumber('seller')->name('sellers.reviews');
+
+    // ---------------- 社群与私信（T6）----------------
+    // 公开面：feed 与详情，只出「已过审且已发布」的帖子
+    Route::get('/posts', [PostController::class, 'index'])->name('posts.index');
+    Route::get('/posts/{post}', [PostController::class, 'show'])
+        ->whereNumber('post')->name('posts.show');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
+        // 我的帖子含待审/未通过，按 status 分 tab 展示
+        Route::get('/me/posts', [PostController::class, 'mine'])->name('posts.mine');
+        Route::delete('/posts/{post}', [PostController::class, 'destroy'])
+            ->whereNumber('post')->name('posts.destroy');
+
+        Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');
+        Route::post('/conversations', [ConversationController::class, 'store'])->name('conversations.store');
+        Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index'])
+            ->whereNumber('conversation')->name('messages.index');
+        Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store'])
+            ->whereNumber('conversation')->name('messages.store');
+    });
+
+    // 帖子人工审核（T6，仅 admin）：只处理 pending
+    Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/posts', [AdminPostController::class, 'index'])->name('posts.index');
+        Route::post('/posts/{post}/review', [AdminPostController::class, 'review'])
+            ->whereNumber('post')->name('posts.review');
+    });
 });
