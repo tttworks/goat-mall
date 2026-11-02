@@ -1,0 +1,48 @@
+# ===== 凭据与环境（铁律：任何密钥不进仓库）=====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+credentials*.json
+secrets*.json
+
+# ===== 依赖与构建产物 =====
+vendor/
+node_modules/
+dist/
+build/
+unpackage/
+.next/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ===== 运行时数据 =====
+storage/*.key
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+bootstrap/cache/*.php
+*.sqlite
+*.sqlite-journal
+data/
+.crawl/
+coverage/
+
+# ===== IDE / 系统 =====
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 临时文件 =====
+*.log
+*.tmp
+*.bak
+~$*
