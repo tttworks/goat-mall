@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PostController;
+use App\Http\Controllers\Api\PostInteractionController;
 use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\RealtimeController;
 use App\Http\Controllers\Api\ReportController;
@@ -266,6 +267,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/posts', [PostController::class, 'index'])->name('posts.index');
     Route::get('/posts/{post}', [PostController::class, 'show'])
         ->whereNumber('post')->name('posts.show');
+    // 评论列表公开：未登录也能看，登录后只影响 liked 标记
+    Route::get('/posts/{post}/comments', [PostInteractionController::class, 'comments'])
+        ->whereNumber('post')->name('posts.comments.index');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
@@ -273,6 +277,16 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/me/posts', [PostController::class, 'mine'])->name('posts.mine');
         Route::delete('/posts/{post}', [PostController::class, 'destroy'])
             ->whereNumber('post')->name('posts.destroy');
+
+        // 互动：点赞幂等（POST 点赞 / DELETE 取消），评论同帖同路径下设子资源
+        Route::post('/posts/{post}/like', [PostInteractionController::class, 'like'])
+            ->whereNumber('post')->name('posts.like');
+        Route::delete('/posts/{post}/like', [PostInteractionController::class, 'unlike'])
+            ->whereNumber('post')->name('posts.unlike');
+        Route::post('/posts/{post}/comments', [PostInteractionController::class, 'createComment'])
+            ->whereNumber('post')->name('posts.comments.store');
+        Route::delete('/posts/{post}/comments/{comment}', [PostInteractionController::class, 'destroyComment'])
+            ->whereNumber('post')->whereNumber('comment')->name('posts.comments.destroy');
 
         // 发帖图片上传：目录锁死 posts（服务端代传，C 端 chooseImage 后逐张上传）
         Route::post('/posts/media', [MediaController::class, 'storePostImage'])->name('posts.media.store');

@@ -9,12 +9,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\PostStatus;
 use App\Http\Requests\PostStoreRequest;
-use App\Models\Post;
 use App\Services\Community\PostService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Validation\Rule;
 
 /**
  * 社群图片帖（T6）。
@@ -40,7 +41,7 @@ class PostController extends Controller
         );
 
         return response()->json([
-            'data' => array_map(fn (Post $post) => $this->posts->payload($post), $page->items()),
+            'data' => $this->posts->payloads($page->items(), $request->user('sanctum')?->user_id),
             'meta' => [
                 'total' => $page->total(),
                 'page' => $page->currentPage(),
@@ -49,9 +50,14 @@ class PostController extends Controller
         ]);
     }
 
-    public function show(int $post): JsonResponse
+    /** 公开详情：带上查看者身份，才能返回 liked（未登录就是 false） */
+    public function show(Request $request, int $post): JsonResponse
     {
-        return response()->json(['data' => $this->posts->payload($this->posts->show($post))]);
+        $viewerId = $request->user('sanctum')?->user_id;
+
+        return response()->json([
+            'data' => $this->posts->payload($this->posts->show($post, $viewerId), $viewerId),
+        ]);
     }
 
     /** 发布：机审结论立即体现在返回的 status 上（approved / rejected / pending） */
@@ -68,7 +74,7 @@ class PostController extends Controller
         $status = $post->status->value;
 
         return response()->json([
-            'data' => $this->posts->payload($post),
+            'data' => $this->posts->payload($post, (int) $request->user()->user_id),
             'message' => match ($status) {
                 'approved' => '发布成功',
                 'rejected' => '内容未通过审核：'.$post->reject_reason,
@@ -81,15 +87,17 @@ class PostController extends Controller
     {
         $validated = $request->validate([
             'per_page' => ['nullable', 'integer', 'between:1,50'],
+            'status' => ['nullable', Rule::enum(PostStatus::class)],
         ]);
 
         $page = $this->posts->mine(
             (int) $request->user()->user_id,
-            (int) ($validated['per_page'] ?? 20)
+            (int) ($validated['per_page'] ?? 20),
+            $validated['status'] ?? null
         );
 
         return response()->json([
-            'data' => array_map(fn (Post $post) => $this->posts->payload($post), $page->items()),
+            'data' => $this->posts->payloads($page->items(), (int) $request->user()->user_id),
             'meta' => [
                 'total' => $page->total(),
                 'page' => $page->currentPage(),
@@ -101,8 +109,9 @@ class PostController extends Controller
     /** 撤回：作者主动下架，软删之外保留状态与时间（申诉留证） */
     public function destroy(Request $request, int $post): JsonResponse
     {
-        $updated = $this->posts->withdraw((int) $request->user()->user_id, $post);
+        $userId = (int) $request->user()->user_id;
+        $updated = $this->posts->withdraw($userId, $post);
 
-        return response()->json(['data' => $this->posts->payload($updated)]);
+        return response()->json(['data' => $this->posts->payload($updated, $userId)]);
     }
 }

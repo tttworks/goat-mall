@@ -68,9 +68,14 @@ class CommunityFlowTest extends TestCase
         $this->getJson('/api/v1/posts')->assertOk()->assertJsonPath('meta.total', 0);
 
         $postId = (int) Post::query()->value('post_id');
+
+        // 换个普通用户看详情：未过审的帖子对他人不可见。
+        // 作者本人能看（从「我的帖子」点进去），所以这里必须换个身份才测得准。
+        Sanctum::actingAs($this->makeUser('post_visitor'));
         $this->getJson("/api/v1/posts/{$postId}")->assertStatus(404);
 
         // 作者在「我的帖子」里能看到未通过原因
+        Sanctum::actingAs($user);
         $this->getJson('/api/v1/me/posts')
             ->assertOk()
             ->assertJsonPath('data.0.status', 'rejected')
@@ -123,10 +128,15 @@ class CommunityFlowTest extends TestCase
 
         // 待审帖不进 feed，他人详情 404，作者自己可见
         $this->getJson('/api/v1/posts')->assertOk()->assertJsonPath('meta.total', 0);
+
+        Sanctum::actingAs($this->makeUser('pending_visitor'));
         $this->getJson("/api/v1/posts/{$postId}")->assertStatus(404);
+
+        Sanctum::actingAs($author);
+        $this->getJson("/api/v1/posts/{$postId}")->assertOk()->assertJsonPath('data.status', 'pending');
         $this->getJson('/api/v1/me/posts')->assertOk()->assertJsonPath('data.0.status', 'pending');
 
-        // 普通用户不能进审核队列
+        // 普通用户不能进审核队列（作者身份已换回）
         $this->getJson('/api/v1/admin/posts')->assertStatus(403);
 
         Sanctum::actingAs($admin);

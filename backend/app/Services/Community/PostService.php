@@ -12,9 +12,11 @@ namespace App\Services\Community;
 use App\Enums\PostStatus;
 use App\Exceptions\SocialException;
 use App\Models\Post;
+use App\Models\PostLike;
 use App\Services\Moderation\Contracts\ModerationChannel;
 use App\Support\MediaUrl;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 
 /**
@@ -92,6 +94,7 @@ class PostService
         return Post::query()
             ->visible()
             ->with('author')
+            ->withCount(['likes', 'visibleComments as comments_count'])
             ->when($keyword !== null && $keyword !== '', function ($query) use ($keyword) {
                 // 转义 LIKE 通配符：用户输入 % 不该变成「全表匹配」
                 $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $keyword);
@@ -105,7 +108,11 @@ class PostService
     /** 详情：已发布任何人可看；未过审/待审只有作者自己能看到（用来展示审核状态） */
     public function show(int $postId, ?int $viewerId = null): Post
     {
-        $post = Post::query()->with('author')->whereKey($postId)->first();
+        $post = Post::query()
+            ->with('author')
+            ->withCount(['likes', 'visibleComments as comments_count'])
+            ->whereKey($postId)
+            ->first();
 
         if ($post === null) {
             throw SocialException::notFound('帖子不存在');
@@ -162,13 +169,63 @@ class PostService
         ]);
     }
 
-    /** 我的帖子：含待审/未通过/已撤回，前端按 status 分 tab */
-    public function mine(int $userId, int $perPage = 20): LengthAwarePaginator
+    /**
+     * 我的帖子：含待审 / 未通过 / 已撤回。
+     *
+     * $status 在 SQL 层过滤而不是前端筛：分页下前端过滤会出现「第 1 页 3 条、第 2 页空」，
+     * 用户会以为内容丢了。
+     */
+    public function mine(int $userId, int $perPage = 20, ?string $status = null): LengthAwarePaginator
     {
         return Post::query()
             ->where('user_id', $userId)
+            ->when($status !== null && $status !== '', fn ($query) => $query->where('status', $status))
+            ->withCount(['likes', 'visibleComments as comments_count'])
             ->orderByDesc('post_id')
             ->paginate($perPage);
+    }
+
+    /**
+     * 点赞（幂等）：重复请求不报错也不重复计数，直接返回当前状态。
+     *
+     * 用关系表 + 唯一约束而不是 posts 上的计数器：并发双击时计数器会多记，
+     * 关系表最多是「重复插入被唯一键挡住」，COUNT 永远是准的。
+     *
+     * @return array{liked: bool, likes_count: int}
+     */
+    public function like(int $userId, int $postId): array
+    {
+        $post = $this->show($postId, $userId);
+
+        try {
+            PostLike::query()->firstOrCreate([
+                'post_id' => $post->post_id,
+                'user_id' => $userId,
+            ]);
+        } catch (QueryException $e) {
+            // 并发重复点赞：唯一约束兜底，结果同样是「已点赞」
+        }
+
+        return [
+            'liked' => true,
+            'likes_count' => PostLike::query()->where('post_id', $post->post_id)->count(),
+        ];
+    }
+
+    /** @return array{liked: bool, likes_count: int} */
+    public function unlike(int $userId, int $postId): array
+    {
+        $post = $this->show($postId, $userId);
+
+        PostLike::query()
+            ->where('post_id', $post->post_id)
+            ->where('user_id', $userId)
+            ->delete();
+
+        return [
+            'liked' => false,
+            'likes_count' => PostLike::query()->where('post_id', $post->post_id)->count(),
+        ];
     }
 
     public function pendingPaginate(int $perPage = 20): LengthAwarePaginator
@@ -189,15 +246,54 @@ class PostService
             ->paginate($perPage);
     }
 
+    /**
+     * 批量载荷：`liked` 一次查完当前用户赞过哪些帖子，避免 feed 里 N+1。
+     *
+     * @param  array<int, Post>  $posts
+     * @return array<int, array<string, mixed>>
+     */
+    public function payloads(array $posts, ?int $viewerId = null): array
+    {
+        $likedIds = [];
+
+        if ($viewerId !== null && $posts !== []) {
+            $likedIds = PostLike::query()
+                ->where('user_id', $viewerId)
+                ->whereIn('post_id', array_map(static fn (Post $post) => (int) $post->post_id, $posts))
+                ->pluck('post_id')
+                ->map(static fn ($id) => (int) $id)
+                ->all();
+        }
+
+        return array_map(
+            fn (Post $post) => $this->payload($post, $viewerId, $likedIds),
+            $posts
+        );
+    }
+
     /** @return array<string, mixed> */
-    public function payload(Post $post): array
+    public function payload(Post $post, ?int $viewerId = null, ?array $likedIds = null): array
     {
         $author = $post->author;
+
+        // withCount / payloads() 已算过就复用，单条展示时再退化为现算
+        $likesCount = isset($post->likes_count) ? (int) $post->likes_count : $post->likes()->count();
+        $commentsCount = isset($post->comments_count) ? (int) $post->comments_count : $post->visibleComments()->count();
+
+        if ($likedIds !== null) {
+            $liked = in_array((int) $post->post_id, $likedIds, true);
+        } else {
+            $liked = $viewerId !== null
+                && $post->likes()->where('user_id', $viewerId)->exists();
+        }
 
         return [
             'post_id' => $post->post_id,
             'content' => $post->content,
             'images' => $post->imageUrls(),
+            'likes_count' => $likesCount,
+            'comments_count' => $commentsCount,
+            'liked' => $liked,
             'status' => $post->status->value,
             'status_label' => $post->status->label(),
             // 未通过时给作者看原因；已发布时为 null

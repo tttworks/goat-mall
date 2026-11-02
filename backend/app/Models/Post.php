@@ -9,11 +9,13 @@
 
 namespace App\Models;
 
+use App\Enums\CommentStatus;
 use App\Enums\PostStatus;
 use App\Support\MediaUrl;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -46,6 +48,32 @@ class Post extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
+    }
+
+    /** @return HasMany<PostLike, $this> */
+    public function likes(): HasMany
+    {
+        return $this->hasMany(PostLike::class, 'post_id', 'post_id');
+    }
+
+    /**
+     * 对外可见的评论：只算 approved，机审待定与未通过的评论不进计数也不进列表。
+     *
+     * 用全部评论的计数会让「评论数 5、列表 3 条」这种对不上的现象出现，
+     * 用户第一反应是平台吞评论。
+     *
+     * @return HasMany<PostComment, $this>
+     */
+    public function visibleComments(): HasMany
+    {
+        return $this->hasMany(PostComment::class, 'post_id', 'post_id')
+            ->where('status', CommentStatus::Approved->value);
+    }
+
+    /** @return HasMany<PostComment, $this> */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(PostComment::class, 'post_id', 'post_id');
     }
 
     public function scopeVisible(Builder $query): Builder
